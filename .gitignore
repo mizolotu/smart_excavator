@@ -121,3 +121,6 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+*.LAPTOP-IS6A1UKI
+*.data-00000-of-00001
+*.index
