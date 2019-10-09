@@ -21,7 +21,7 @@ class Actor(object):
 
                 num_of_vars = len(tf.compat.v1.trainable_variables())
                 self.inputs, self.outputs, self.norm_dist, self.mu, self.sigma = self.create_actor_network()
-                self.deltas = tf.compat.v1.placeholder(tf.float32, shape=[None, 1])
+                self.deltas = tf.compat.v1.placeholder(tf.float32, shape=[None, self.a_dim])
                 self.network_params = tf.compat.v1.trainable_variables()[num_of_vars:]
                 self.loss = - tf.reduce_mean(tf.log(self.norm_dist.prob(self.outputs) + 1e-5) * self.deltas)
                 self.optimize = tf.train.AdamOptimizer(self.learning_rate).minimize(self.loss)
@@ -30,7 +30,7 @@ class Actor(object):
                 sigma_summary = tf.compat.v1.summary.histogram("Action sigma", self.sigma)
                 self.summary = tf.compat.v1.summary.merge([loss_summary, mu_summary, sigma_summary])
 
-    def create_actor_network(self, n_hidden=32, n_dense=32):
+    def create_actor_network(self, n_hidden=256, n_dense=256):
         inputs = tf.compat.v1.placeholder(tf.float32, shape=[None, *self.s_dim])
         if self.policy == 'dense':
             inputs_reshaped = tf.keras.layers.Flatten()(inputs)

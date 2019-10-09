@@ -46,9 +46,9 @@ action_dim = 4
 
 # Other parameters
 
-max_move_iterations = 16
+n_attempts_to_reach_target = 8
 n_iterations_stay = 1
-pid_gain_limit = 100
+pid_gain_limit = 10
 
 # RL agent
 
@@ -110,9 +110,9 @@ def points_to_deltas(points, target_point):
             deltas[-1].append(np.abs(p - t))
     return deltas
 
-def get_pid_gains(deltas, delta_end, in_target, time_passed, time_limit, done):
+def get_pid_gains(deltas, delta_start, delta_end, in_target, time_passed, time_limit, done):
     uri = 'http://{0}/{1}'.format(agent, control_uri)
-    jdata = {'deltas': deltas, 'delta_end': delta_end, 'in_target': in_target, 'time': time_passed, 'time_limit': time_limit, 'done': done}
+    jdata = {'deltas': deltas, 'delta_start': delta_start, 'delta_end': delta_end, 'in_target': in_target, 'time': time_passed, 'time_limit': time_limit, 'done': done}
     try:
         r = requests.get(uri, json=jdata)
         jdata = r.json()
@@ -123,6 +123,7 @@ def get_pid_gains(deltas, delta_end, in_target, time_passed, time_limit, done):
         print(e)
         gains = np.vstack([[0 for _ in range(action_dim)] for _ in range(pid_dim)])
         success = False
+    print(gains)
     return gains, success
 
 def generate_reset_trajectory(trajectory, trajectory_idx):
@@ -171,14 +172,13 @@ def initScript():
     GObject.data['trajectory'] = []
     GObject.data['timestamps'] = []
     GObject.data['trajectory_idx'] = 0
-    GObject.data['total_move_iteration'] = 0
-    GObject.data['trajectory_move_iteration'] = 0
     GObject.data['in_target'] = np.zeros(action_dim)
     GObject.data['start_time'] = time()
     GObject.data['last_time'] = time()
     GObject.data['ticks_since_last_time'] = 0.0
     GObject.data['score'] = 0
     GObject.data['done'] = False
+    GObject.data['n_attempts'] = 0
     GObject.data['stuck'] = False
     GObject.data['are_pid_gains_set'] = False
     GObject.data['target_set_time'] = time()
@@ -189,6 +189,7 @@ def initScript():
     real_values = [x.value() for x in GObject.data['component_objects']]
     for _ in range(time_dim):
         GObject.data['points'].append(real_values)
+    GObject.data['delta_start'] = [0 for _ in range(action_dim)]
     GObject.data['delta_end'] = [0 for _ in range(action_dim)]
     GObject.data['controls'] = np.zeros(action_dim)
     GObject.data['integ_prev'] = np.zeros(action_dim)
@@ -259,6 +260,7 @@ def callScript(deltaTime, simulationTime):
                 GObject.data['trajectory_idx'] = 0
                 GObject.data['is_trajectory_set'] = True
                 GObject.data['ticks_since_last_time'] = 0.0
+                GObject.data['n_attempts'] = 0
 
                 # PID control gains for the 1-st target in the trajectory
 
@@ -267,20 +269,20 @@ def callScript(deltaTime, simulationTime):
                 target = trajectory[idx, :]
                 deltas = points_to_deltas(points, target)
                 last_delta = deltas[-1]
-                done = GObject.data['done']
-                time_spent = time() - GObject.data['target_set_time']
                 if np.all(np.array(last_delta) <= move_thr):
                     in_target = True
                 else:
                     in_target = False
                 gains, success = get_pid_gains(
                     deltas,
+                    GObject.data['delta_start'],
                     GObject.data['delta_end'],
                     in_target,
-                    time_spent,
-                    time_spent,
-                    done
+                    time() - GObject.data['target_set_time'],
+                    time() - GObject.data['target_set_time'],
+                    GObject.data['done']
                 )
+                GObject.data['delta_start'] = last_delta
                 GObject.data['target_set_time'] = time()
                 GObject.data['pid_gains'] = gains
                 GObject.data['are_pid_gains_set'] = success
@@ -314,28 +316,24 @@ def callScript(deltaTime, simulationTime):
                 elif target_reached[i] == 0:
                     GObject.data['in_target'][i] = 0
 
-            # if the target point or time limit has been reached
+            # if the target point has been reached
 
-            if np.all(GObject.data['in_target'] >= n_iterations_stay) or time() - GObject.data['target_set_time'] > time_limit:
+            if np.all(GObject.data['in_target'] >= n_iterations_stay):
 
-                # remember last delta for mover score calculation
+                # nulify in_target and attempt count
 
-                GObject.data['delta_end'] = deltas[-1]
-
-                # increment total_move_iteration and nulify trajectory_move_iteration
-
-                GObject.data['total_move_iteration'] += 1
-                GObject.data['trajectory_move_iteration'] = 0
                 GObject.data['in_target'] = np.zeros(action_dim)
-                GObject.data['stuck'] = False
+                GObject.data['n_attempts'] = 0
 
                 # if the trajectory has been completed
 
                 if GObject.data['trajectory_idx'] >= len(GObject.data['trajectory']) - 1:
+
+                    # remember done and last delta
+
                     GObject.data['done'] = True
-                    if GObject.data['mode'].endswith('TRAIN') and GObject.data['total_move_iteration'] >= max_move_iterations:
-                        GObject.data['total_move_iteration'] = 0
                     GObject.data['is_trajectory_set'] = False
+                    GObject.data['delta_end'] = list(deltas[-1])
 
                     # check status
 
@@ -349,37 +347,99 @@ def callScript(deltaTime, simulationTime):
                             open(user_input_fname, 'w').close()
                             print('\nUSER INPUT\n')
 
-                # if there are still points in the trajectory, just continue
+                # if there are still points in the trajectory or time limit has been reached, just continue
 
                 else:
+
+                    # remember start and end delta
+
+                    delta_start = GObject.data['delta_start']
+                    delta_end = list(deltas[-1])
+
+                    # increment trajectory index
+
                     GObject.data['trajectory_idx'] += 1
 
-                    # PID control gains for the rest of the targets in the trajectory
+                    # switch the target
 
                     trajectory = GObject.data['trajectory']
                     idx = GObject.data['trajectory_idx']
                     target = trajectory[idx, :]
+
+                    # recalculate deltas and time spent
+
                     deltas = points_to_deltas(points, target)
                     last_delta = deltas[-1]
                     time_spent = time() - GObject.data['target_set_time']
-                    done = False
+
+                    # request PID gains
+
+                    done = True # False
                     if np.all(np.array(last_delta) <= move_thr):
                         in_target = True
                     else:
                         in_target = False
                     gains, success = get_pid_gains(
                         deltas,
-                        GObject.data['delta_end'],
+                        delta_start,
+                        delta_end,
                         in_target,
                         time_spent,
                         time_limit,
                         done
                     )
+                    GObject.data['delta_start'] = list(last_delta)
                     GObject.data['pid_gains'] = gains
                     GObject.data['are_pid_gains_set'] = success
                     GObject.data['integ_prev'] = np.zeros(action_dim)
                     GObject.data['target_set_time'] = time()
                     GObject.data['done'] = False
+
+            # if time limit has been reached, we request new PID gains without switching the target
+
+            elif time() - GObject.data['target_set_time'] > time_limit:
+
+                # increment attempt count
+
+                GObject.data['n_attempts'] += 1
+
+                # remember start and end delta for mover score calculation
+
+                delta_start = GObject.data['delta_start']
+                delta_end = list(deltas[-1])
+
+                # request new PID control gains
+
+                last_delta = deltas[-1]
+                time_spent = time() - GObject.data['target_set_time']
+                if GObject.data['n_attempts'] >= n_attempts_to_reach_target:
+                    done = True
+                    GObject.data['n_attempts'] = 0
+                else:
+                    done = False
+                if np.all(np.array(last_delta) <= move_thr):
+                    in_target = True
+                else:
+                    in_target = False
+                gains, success = get_pid_gains(
+                    deltas,
+                    delta_start,
+                    delta_end,
+                    in_target,
+                    time_spent,
+                    time_limit,
+                    done
+                )
+
+                # we do not update delta start if target has not been reached
+
+                # GObject.data['delta_start'] = list(last_delta)
+
+                GObject.data['pid_gains'] = gains
+                GObject.data['are_pid_gains_set'] = success
+                GObject.data['integ_prev'] = np.zeros(action_dim)
+                GObject.data['target_set_time'] = time()
+                GObject.data['done'] = False
 
             # recalculate PID controls
 
@@ -396,8 +456,6 @@ def callScript(deltaTime, simulationTime):
     if time_passed:
 
         if change_controls:
-
-            GObject.data['trajectory_move_iteration'] +=1
 
             # set input values
 
