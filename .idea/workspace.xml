@@ -39,7 +39,7 @@
       </list>
     </option>
   </component>
-  <component name="RunManager" selected="Python.excavator_train_supervised">
+  <component name="RunManager" selected="Python.excavator_server">
     <configuration name="dqn" type="PythonConfigurationType" factoryName="Python" temporary="true">
       <module name="SmartExcavator" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -147,9 +147,9 @@
     </configuration>
     <recent_temporary>
       <list>
-        <item itemvalue="Python.excavator_train_supervised" />
         <item itemvalue="Python.excavator_server" />
         <item itemvalue="Python.generate_levels" />
+        <item itemvalue="Python.excavator_train_supervised" />
         <item itemvalue="Python.dqn" />
         <item itemvalue="Python.replay_buffer" />
       </list>

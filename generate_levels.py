@@ -78,7 +78,7 @@ def partition_cycle(cycle, t_eps=10, n_bins=50):
             cycle_s['x'][:, 0] <= emptying_slew + bin_size * bin_alpha
         )
     )[0]
-    return digging_idx, emptying_idx
+    return digging_idx, emptying_idx, np.arange(0, digging_idx[0]), np.arange(digging_idx[-1], emptying_idx[0])
 
 def analyze_sequence(xd, xe, a_step=0.25, a_radius=0.5):
     bucket_angle_dif = []
@@ -157,10 +157,12 @@ if __name__ == '__main__':
         for i, cycle in enumerate(cycles):
             if i == 0:
                 generate_user_input(user_input_file, cycle)
-            dig_i, emp_i = partition_cycle(cycle)
+            dig_i, emp_i, to_dig_i, to_emp_i = partition_cycle(cycle)
             task_i = [
                 dig_i,
-                emp_i
+                emp_i,
+                to_dig_i,
+                to_emp_i
             ]
             n_steps = 32
             tasks = []
@@ -182,7 +184,7 @@ if __name__ == '__main__':
             #points_resampled, time_step = resample_cycle_points(cycle, n_steps=128)
             #X.append(points_resampled)
             #levels.append((points_resampled, time_step, tasks[0], tasks[1]))
-            levels.append((cycle['x'], cycle['t'], dig, emp))
+            levels.append((cycle['x'], cycle['t'], tasks))
 
     # dig and emp start points
 
