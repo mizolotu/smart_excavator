@@ -127,6 +127,6 @@ dmypy.json
 *.index
 *.xml
 *.tempstate10811263933717445677
-.idea/*
-logs/*
-models/*
+.idea/
+logs/
+models/
