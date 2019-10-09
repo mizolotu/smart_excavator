@@ -40,14 +40,14 @@ class DDQN(object):
 
     def create_q_network(self, n_hidden=16, n_dense=32):
 
-        inputs = tf.compat.v1.placeholder(tf.float32, shape=[None, *self.s_dim])
+        inputs = tf.compat.v1.placeholder(tf.float32, shape=[None, self.s_dim[0], self.s_dim[1]])
         action = tf.compat.v1.placeholder(tf.float32, [None, self.a_dim])
 
         if self.policy == 'dense':
             inputs_reshaped = tf.keras.layers.Flatten()(inputs)
             hidden = tf.keras.layers.Dense(units=n_hidden, activation=tf.nn.relu)(inputs_reshaped)
         elif self.policy == 'conv':
-            inputs_reshaped = tf.reshape(inputs, shape=[tf.shape(inputs)[0], 1, *self.s_dim])
+            inputs_reshaped = tf.reshape(inputs, shape=[tf.shape(inputs)[0], 1, self.s_dim[0], self.s_dim[1]])
             conv1 = tf.keras.layers.Conv2D(
                 filters=n_hidden, kernel_size=[1, self.s_dim[1]],
                 strides=[1, self.s_dim[1]],
