@@ -18,12 +18,13 @@ class TimePredictor(object):
                 self.optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate=lr).minimize(self.loss)
 
     def train(self, inputs, outputs, epochs=100000):
+        print('Training on {0} samples:'.format(inputs.shape[0]))
         for e in range(epochs):
             _, loss = self.sess.run([self.optimizer, self.loss], feed_dict={
                 self.inputs: inputs,
                 self.outputs: outputs
             })
-            if e % int(epochs / 10) == 0:
+            if e % int(epochs / 100) == 0:
                 print('Loss at epoch {0}: {1}'.format(e, loss))
 
     def predict(self, inputs):
@@ -49,12 +50,13 @@ class SequenceGenerator(object):
                 self.optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate=lr).minimize(self.loss)
 
     def train(self, inputs, outputs, epochs=10000):
+        print('Training on {0} samples:'.format(inputs.shape[0]))
         for e in range(epochs):
             _, loss = self.sess.run([self.optimizer, self.loss], feed_dict={
                 self.inputs: inputs,
                 self.outputs: outputs
             })
-            if e % int(epochs / 10) == 0:
+            if e % int(epochs / 100) == 0:
                 print('Loss at epoch: {0}: {1}'.format(e, loss))
 
     def predict(self, inputs):
