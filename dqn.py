@@ -31,7 +31,7 @@ class DDQN(object):
 
                 self.abs_errors = tf.abs(self.predicted_q_value - self.q)
                 self.loss = tf.reduce_mean(self.weights * tf.square(self.predicted_q_value - self.q))
-                self.optimize = tf.train.RMSPropOptimizer(self.learning_rate).minimize(self.loss)
+                self.optimize = tf.compat.v1.train.RMSPropOptimizer(self.learning_rate).minimize(self.loss)
 
                 q_summary = tf.compat.v1.summary.scalar("Q-value", tf.reduce_mean(self.predicted_q_value))
                 loss_summary = tf.compat.v1.summary.scalar("Loss", self.loss)

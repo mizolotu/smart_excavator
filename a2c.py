@@ -24,13 +24,13 @@ class Actor(object):
                 self.deltas = tf.compat.v1.placeholder(tf.float32, shape=[None, self.a_dim])
                 self.network_params = tf.compat.v1.trainable_variables()[num_of_vars:]
                 self.loss = - tf.reduce_mean(tf.log(self.norm_dist.prob(self.outputs) + 1e-5) * self.deltas)
-                self.optimize = tf.train.AdamOptimizer(self.learning_rate).minimize(self.loss)
+                self.optimize = tf.compat.v1.train.AdamOptimizer(self.learning_rate).minimize(self.loss)
                 loss_summary = tf.compat.v1.summary.scalar("Actor loss", self.loss)
                 mu_summary = tf.compat.v1.summary.histogram("Action mu", self.mu)
                 sigma_summary = tf.compat.v1.summary.histogram("Action sigma", self.sigma)
                 self.summary = tf.compat.v1.summary.merge([loss_summary, mu_summary, sigma_summary])
 
-    def create_actor_network(self, n_hidden=256, n_dense=256):
+    def create_actor_network(self, n_hidden=256, n_dense=32):
         inputs = tf.compat.v1.placeholder(tf.float32, shape=[None, self.s_dim[0], self.s_dim[1]])
         if self.policy == 'dense':
             inputs_reshaped = tf.keras.layers.Flatten()(inputs)
@@ -47,15 +47,26 @@ class Actor(object):
             lstm_cell = tf.keras.layers.LSTMCell(units=n_hidden)
             rnn_output = tf.keras.layers.RNN(lstm_cell)(inputs)
             hidden = tf.keras.layers.Flatten()(rnn_output)
-        dense_a2 = tf.keras.layers.Dense(units=n_dense, activation=tf.nn.relu)(hidden)
-        mu = tf.keras.layers.Dense(units=self.a_dim)(dense_a2)
-        mu = tf.nn.softplus(mu) + 1e-5
-        sigma = tf.keras.layers.Dense(units=self.a_dim)(dense_a2)
-        sigma = tf.nn.softplus(sigma) + 1e-5
+        mus = []
+        sigmas = []
+        for i in range(self.a_dim):
+            mu_i, sigma_i = self.stream(hidden, n_dense)
+            mus.append(mu_i)
+            sigmas.append(sigma_i)
+        mu = tf.concat(mus, axis=1)
+        sigma = tf.concat(sigmas, axis=1)
         norm_dist = tf.contrib.distributions.Normal(mu, sigma)
         outputs = tf.squeeze(norm_dist.sample(1), axis=0)
         outputs = tf.clip_by_value(outputs, 0, self.action_bound)
         return inputs, outputs, norm_dist, mu, sigma
+
+    def stream(self, hidden, n_dense):
+        dense = tf.keras.layers.Dense(units=n_dense, activation=tf.nn.relu)(hidden)
+        mu = tf.keras.layers.Dense(units=1)(dense)
+        mu = tf.nn.softplus(mu) + 1e-5
+        sigma = tf.keras.layers.Dense(units=1)(dense)
+        sigma = tf.nn.softplus(sigma) + 1e-5
+        return mu, sigma
 
     def train(self, inputs, outputs, deltas):
         with self.graph.as_default():
@@ -96,7 +107,7 @@ class Critic(object):
                 loss_summary = tf.compat.v1.summary.scalar("Critic loss", self.loss)
                 self.summary = tf.compat.v1.summary.merge([loss_summary])
 
-    def create_critic_network(self, n_hidden=256, n_dense=256):
+    def create_critic_network(self, n_hidden=256, n_dense=32):
         inputs = tf.compat.v1.placeholder(tf.float32, shape=[None, self.s_dim[0], self.s_dim[1]])
         if self.policy == 'dense':
             inputs_reshaped = tf.keras.layers.Flatten()(inputs)
@@ -113,9 +124,16 @@ class Critic(object):
             lstm_cell = tf.keras.layers.LSTMCell(units=n_hidden)
             rnn_output = tf.keras.layers.RNN(lstm_cell)(inputs)
             hidden = tf.keras.layers.Flatten()(rnn_output)
-        dense = tf.keras.layers.Dense(units=n_dense, activation=tf.nn.relu)(hidden)
-        values = tf.keras.layers.Dense(units=self.a_dim, activation=None)(dense)
+        vals = []
+        for i in range(self.a_dim):
+            vals.append(self.stream(hidden, n_dense))
+        values = tf.concat(vals, axis=1)
         return inputs, values
+
+    def stream(self, hidden, n_dense):
+        dense = tf.keras.layers.Dense(units=n_dense, activation=tf.nn.relu)(hidden)
+        value = tf.keras.layers.Dense(units=1, activation=None)(dense)
+        return value
 
     def train(self, inputs, targets):
         with self.graph.as_default():

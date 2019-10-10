@@ -46,9 +46,9 @@ class ReplayBuffer(object):
         priorities = np.array([_[5] for _ in self.buffer])
         sampling_probabilities = priorities / np.sum(priorities)
         if rnd:
-            idx_batch = np.random.choice(self.count, batch_size, replace=False, p=sampling_probabilities)
+            idx_batch = np.random.choice(self.count, n, replace=False, p=sampling_probabilities)
         else:
-            idx_batch = np.arange(batch_size)
+            idx_batch = np.arange(n)
         self.per_b = np.min([1., self.per_b + self.per_b_increment_per_sampling])
         p_min = np.min(priorities) / np.sum(priorities)
         max_weight = (p_min * n) ** (-self.per_b)

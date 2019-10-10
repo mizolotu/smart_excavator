@@ -431,9 +431,9 @@ def callScript(deltaTime, simulationTime):
                     done
                 )
 
-                # we do not update delta start if target has not been reached
+                # we do not update delta start if target has not been reached, or do we?
 
-                # GObject.data['delta_start'] = list(last_delta)
+                GObject.data['delta_start'] = list(last_delta)
 
                 GObject.data['pid_gains'] = gains
                 GObject.data['are_pid_gains_set'] = success
