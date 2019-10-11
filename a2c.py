@@ -104,8 +104,10 @@ class Critic(object):
 
                 self.loss = tf.reduce_mean(tf.square(self.targets - self.values))
                 self.optimize = tf.compat.v1.train.AdamOptimizer(self.learning_rate).minimize(self.loss)
+
+                target_summary = tf.compat.v1.summary.scalar("Critic target", tf.reduce_mean(self.targets))
                 loss_summary = tf.compat.v1.summary.scalar("Critic loss", self.loss)
-                self.summary = tf.compat.v1.summary.merge([loss_summary])
+                self.summary = tf.compat.v1.summary.merge([target_summary, loss_summary])
 
     def create_critic_network(self, n_hidden=256, n_dense=32):
         inputs = tf.compat.v1.placeholder(tf.float32, shape=[None, self.s_dim[0], self.s_dim[1]])

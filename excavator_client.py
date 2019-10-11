@@ -46,10 +46,13 @@ action_dim = 4
 
 # Other parameters
 
-n_attempts_to_reach_target = 8
+n_attempts_to_reach_target = 64
 n_iterations_stay = 1
-pid_gain_limit = 10
-
+pid_gain_limits = np.vstack([
+    100 * np.ones(action_dim),
+    1 * np.ones(action_dim),
+    10 * np.ones(action_dim)
+])
 # RL agent
 
 agent = '127.0.0.1:5000'
@@ -117,7 +120,7 @@ def get_pid_gains(deltas, delta_start, delta_end, in_target, time_passed, time_l
         r = requests.get(uri, json=jdata)
         jdata = r.json()
         controls = jdata['controls']
-        gains = pid_gain_limit * np.array(controls)
+        gains = pid_gain_limits * np.array(controls)
         success = True
     except Exception as e:
         print(e)
@@ -431,9 +434,10 @@ def callScript(deltaTime, simulationTime):
                     done
                 )
 
-                # we do not update delta start if target has not been reached, or do we?
+                # we update delta_start only in case of no attempts left
 
-                GObject.data['delta_start'] = list(last_delta)
+                if done:
+                    GObject.data['delta_start'] = list(last_delta)
 
                 GObject.data['pid_gains'] = gains
                 GObject.data['are_pid_gains_set'] = success
