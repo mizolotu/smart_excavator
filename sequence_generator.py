@@ -24,7 +24,7 @@ class TimePredictor(object):
                 self.inputs: inputs,
                 self.outputs: outputs
             })
-            if e % int(epochs / 100) == 0:
+            if (e + 1) % int(epochs / 100) == 0:
                 print('Loss at epoch {0}: {1}'.format(e, loss))
 
     def predict(self, inputs):
@@ -56,7 +56,7 @@ class SequenceGenerator(object):
                 self.inputs: inputs,
                 self.outputs: outputs
             })
-            if e % int(epochs / 100) == 0:
+            if (e + 1) % int(epochs / 100) == 0:
                 print('Loss at epoch: {0}: {1}'.format(e, loss))
 
     def predict(self, inputs):

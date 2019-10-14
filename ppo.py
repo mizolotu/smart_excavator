@@ -1,34 +1,35 @@
-import numpy as np
 import tensorflow as tf
 
 # Actor model
 
 class Actor(object):
 
-    def __init__(self, graph, sess, s_dim, a_dim, a_bound, lr, policy='dense', a_distr='normal', streams=False):
+    def __init__(self, graph, sess, s_dim, a_dim, lr, clip_range, policy='dense'):
         self.graph = graph
         self.sess = sess
         self.s_dim = s_dim
         self.a_dim = a_dim
-        self.action_bound = a_bound
         self.learning_rate = lr
+        self.clip_range = clip_range
         self.policy = policy
-        self.a_distr = a_distr
-        self.streams = streams
 
         # main network
 
         with self.graph.as_default():
             with self.sess.as_default():
 
-                self.inputs, self.outputs, self.norm_dist, self.mu, self.sigma = self.create_actor_network()
-                self.deltas = tf.compat.v1.placeholder(tf.float32, shape=[None, self.a_dim])
-                self.loss = - tf.reduce_mean(tf.log(self.norm_dist.prob(self.outputs) + 1e-5) * self.deltas)
+                self.inputs, self.outputs, self.dist = self.create_actor_network()
+                self.advantages = tf.compat.v1.placeholder(tf.float32, shape=[None, self.a_dim])
+                self.old_neglog = tf.compat.v1.placeholder(tf.float32, shape=[None, self.a_dim])
+
+                self.neglog = - self.dist.log_prob(self.outputs)
+                ratio = tf.exp(self.old_neglog - self.neglog)
+                loss_unclipped = - self.advantages * ratio
+                loss_clipped = - self.advantages * tf.clip_by_value(ratio, 1.0 - self.clip_range, 1.0 + self.clip_range)
+                self.loss = tf.reduce_mean(tf.maximum(loss_unclipped, loss_clipped))
                 self.optimize = tf.compat.v1.train.AdamOptimizer(self.learning_rate).minimize(self.loss)
-                loss_summary = tf.compat.v1.summary.scalar("Actor/Loss", self.loss)
-                mu_summary = tf.compat.v1.summary.histogram("Action mu", self.mu)
-                sigma_summary = tf.compat.v1.summary.histogram("Action sigma", self.sigma)
-                self.summary = tf.compat.v1.summary.merge([loss_summary, mu_summary, sigma_summary])
+                loss_summary = tf.compat.v1.summary.scalar("Actor loss", self.loss)
+                self.summary = tf.compat.v1.summary.merge([loss_summary])
 
     def create_actor_network(self, n_hidden=32, n_dense=16):
         inputs = tf.compat.v1.placeholder(tf.float32, shape=[None, self.s_dim[0], self.s_dim[1]])
@@ -47,40 +48,19 @@ class Actor(object):
             lstm_cell = tf.keras.layers.LSTMCell(units=n_hidden)
             rnn_output = tf.keras.layers.RNN(lstm_cell)(inputs)
             hidden = tf.keras.layers.Flatten()(rnn_output)
-        if self.streams == True:
-            mus = []
-            sigmas = []
-            for i in range(self.a_dim):
-                mu_i, sigma_i = self.stream(hidden, n_dense)
-                mus.append(mu_i)
-                sigmas.append(sigma_i)
-            mu = tf.concat(mus, axis=1)
-            sigma = tf.concat(sigmas, axis=1)
-        else:
-            dense = tf.keras.layers.Dense(units=n_dense, activation=tf.nn.relu)(hidden)
-            mu = tf.keras.layers.Dense(units=self.a_dim)(dense)
-            mu = tf.nn.softplus(mu) + 1e-5
-            sigma = tf.keras.layers.Dense(units=self.a_dim)(dense)
-            sigma = tf.nn.softplus(sigma) + 1e-5
-        norm_dist = tf.contrib.distributions.Normal(mu, sigma)
-        outputs = tf.squeeze(norm_dist.sample(1), axis=0)
-        outputs = tf.clip_by_value(outputs, 0, self.action_bound)
-        return inputs, outputs, norm_dist, mu, sigma
-
-    def stream(self, hidden, n_dense):
         dense = tf.keras.layers.Dense(units=n_dense, activation=tf.nn.relu)(hidden)
-        mu = tf.keras.layers.Dense(units=1)(dense)
-        mu = tf.nn.softplus(mu) + 1e-5
-        sigma = tf.keras.layers.Dense(units=1)(dense)
-        sigma = tf.nn.softplus(sigma) + 1e-5
-        return mu, sigma
+        logits = tf.keras.layers.Dense(units=self.a_dim)(dense)
+        dist = tf.contrib.distributions.OneHotCategorical(logits=logits)
+        outputs = tf.squeeze(dist.sample(1), axis=0)
+        return inputs, outputs, dist
 
-    def train(self, inputs, outputs, deltas):
+    def train(self, inputs, outputs, deltas, neglogs):
         with self.graph.as_default():
             return self.sess.run([self.optimize, self.summary], feed_dict={
                 self.inputs: inputs,
                 self.outputs: outputs,
-                self.deltas: deltas
+                self.deltas: deltas,
+                self.old_neglog: neglogs
             })
 
     def predict(self, inputs):
@@ -89,26 +69,36 @@ class Actor(object):
                 self.inputs: inputs
             })
 
+    def get_neglog(self, inputs):
+        with self.graph.as_default():
+            return self.sess.run(self.neglog, feed_dict={
+                self.inputs: inputs
+            })
+
 # Critic model
 
 class Critic(object):
 
-    def __init__(self, graph, sess, s_dim, a_dim, lr, policy='dense', streams='False'):
+    def __init__(self, graph, sess, s_dim, a_dim, lr, clip_range, policy='dense'):
         self.graph = graph
         self.sess = sess
         self.s_dim = s_dim
         self.a_dim = a_dim
         self.learning_rate = lr
+        self.clip_range = clip_range
         self.policy = policy
-        self.streams = streams
 
         with self.graph.as_default():
             with self.sess.as_default():
 
                 self.inputs, self.values = self.create_critic_network()
                 self.targets = tf.compat.v1.placeholder(tf.float32, shape=[None, self.a_dim])
+                self.old_values = tf.placeholder(tf.float32, [None, self.a_dim])
 
-                self.loss = tf.reduce_mean(tf.square(self.targets - self.values))
+                values_clipped = self.old_values + tf.clip_by_value(self.values - self.old_values, - self.clip_range, self.clip_range)
+                loss_unclipped = tf.square(self.values - self.targets)
+                loss_clipped = tf.square(values_clipped - self.targets)
+                self.loss = tf.reduce_mean(tf.maximum(loss_unclipped, loss_clipped))
                 self.optimize = tf.compat.v1.train.AdamOptimizer(self.learning_rate).minimize(self.loss)
 
                 target_summary = tf.compat.v1.summary.scalar("Critic/Target", tf.reduce_mean(self.targets))
@@ -132,26 +122,16 @@ class Critic(object):
             lstm_cell = tf.keras.layers.LSTMCell(units=n_hidden)
             rnn_output = tf.keras.layers.RNN(lstm_cell)(inputs)
             hidden = tf.keras.layers.Flatten()(rnn_output)
-        if self.streams == True:
-            vals = []
-            for i in range(self.a_dim):
-                vals.append(self.stream(hidden, n_dense))
-            values = tf.concat(vals, axis=1)
-        else:
-            dense = tf.keras.layers.Dense(units=n_dense, activation=tf.nn.relu)(hidden)
-            values = tf.keras.layers.Dense(units=self.a_dim, activation=None)(dense)
+        dense = tf.keras.layers.Dense(units=n_dense, activation=tf.nn.relu)(hidden)
+        values = tf.keras.layers.Dense(units=self.a_dim, activation=None)(dense)
         return inputs, values
 
-    def stream(self, hidden, n_dense):
-        dense = tf.keras.layers.Dense(units=n_dense, activation=tf.nn.relu)(hidden)
-        value = tf.keras.layers.Dense(units=1, activation=None)(dense)
-        return value
-
-    def train(self, inputs, targets):
+    def train(self, inputs, targets, values):
         with self.graph.as_default():
             return self.sess.run([self.optimize, self.summary], feed_dict={
                 self.inputs: inputs,
-                self.targets: targets
+                self.targets: targets,
+                self.old_values: values
             })
 
     def predict(self, inputs):
