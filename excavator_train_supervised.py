@@ -18,7 +18,7 @@ if __name__ == '__main__':
 
     # train data
 
-    TX, TY, mm_d, ss_D, DX, DY, EX, EY, ss, mm, Digs, Emps, key_points, key_stats, rx_min, rx_max = get_recorded_data()
+    RX_raw, T_raw, TX, TY, ss_d, mm_d, ss_D, DX, DY, EX, EY, ss, mm, Digs, Emps, key_points, key_stats, rx_min, rx_max = get_recorded_data()
     cycle_start_point, cycle_end_point, dig_start_point, dig_end_point, emp_start_point, emp_end_point = key_points
     dig_bucket_diff, emp_bucket_diff, dig_mean_angle, emp_mean_angle = key_stats
 

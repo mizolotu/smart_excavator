@@ -25,7 +25,7 @@ class TimePredictor(object):
                 self.outputs: outputs
             })
             if (e + 1) % int(epochs / 100) == 0:
-                print('Loss at epoch {0}: {1}'.format(e, loss))
+                print('Loss at epoch {0}: {1}'.format(e + 1, loss))
 
     def predict(self, inputs):
         return self.sess.run(self.prediction, feed_dict={
@@ -57,7 +57,41 @@ class SequenceGenerator(object):
                 self.outputs: outputs
             })
             if (e + 1) % int(epochs / 100) == 0:
-                print('Loss at epoch: {0}: {1}'.format(e, loss))
+                print('Loss at epoch: {0}: {1}'.format(e + 1, loss))
+
+    def predict(self, inputs):
+        return self.sess.run(self.prediction, feed_dict={
+            self.inputs: inputs,
+       })
+
+class AngleDetector(object):
+
+    def __init__(self, graph, sess, n_steps, n_features, n_hidden=64, n_dense=32, lr=0.0001):
+
+        self.graph = graph
+        self.sess = sess
+
+        with self.graph.as_default():
+            with self.sess.as_default():
+                self.inputs = tf.compat.v1.placeholder(tf.float32, shape=[None, n_steps, n_features])
+                self.outputs = tf.compat.v1.placeholder(tf.float32, shape=[None, 2])
+                lstm_cell = tf.keras.layers.LSTMCell(units=n_hidden)
+                rnn_output = tf.keras.layers.RNN(lstm_cell)(self.inputs)
+                hidden = tf.keras.layers.Flatten()(rnn_output)
+                dense = tf.keras.layers.Dense(n_dense, activation=tf.nn.relu)(hidden)
+                self.prediction = tf.keras.layers.Dense(2)(dense)
+                self.loss = tf.compat.v1.losses.mean_squared_error(labels=self.outputs, predictions=self.prediction)
+                self.optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate=lr).minimize(self.loss)
+
+    def train(self, inputs, outputs, epochs=100000):
+        print('Training on {0} samples:'.format(inputs.shape[0]))
+        for e in range(epochs):
+            _, loss = self.sess.run([self.optimizer, self.loss], feed_dict={
+                self.inputs: inputs,
+                self.outputs: outputs
+            })
+            if (e + 1) % int(epochs / 100) == 0:
+                print('Loss at epoch {0}: {1}'.format(e + 1, loss))
 
     def predict(self, inputs):
         return self.sess.run(self.prediction, feed_dict={

@@ -19,8 +19,8 @@ class Actor(object):
             with self.sess.as_default():
 
                 self.inputs, self.outputs, self.dist = self.create_actor_network()
-                self.advantages = tf.compat.v1.placeholder(tf.float32, shape=[None, self.a_dim])
-                self.old_neglog = tf.compat.v1.placeholder(tf.float32, shape=[None, self.a_dim])
+                self.advantages = tf.compat.v1.placeholder(tf.float32, shape=[None, 1])
+                self.old_neglog = tf.compat.v1.placeholder(tf.float32, shape=[None, 1])
 
                 self.neglog = - self.dist.log_prob(self.outputs)
                 ratio = tf.exp(self.old_neglog - self.neglog)
@@ -28,10 +28,10 @@ class Actor(object):
                 loss_clipped = - self.advantages * tf.clip_by_value(ratio, 1.0 - self.clip_range, 1.0 + self.clip_range)
                 self.loss = tf.reduce_mean(tf.maximum(loss_unclipped, loss_clipped))
                 self.optimize = tf.compat.v1.train.AdamOptimizer(self.learning_rate).minimize(self.loss)
-                loss_summary = tf.compat.v1.summary.scalar("Actor loss", self.loss)
+                loss_summary = tf.compat.v1.summary.scalar("Actor/Loss", self.loss)
                 self.summary = tf.compat.v1.summary.merge([loss_summary])
 
-    def create_actor_network(self, n_hidden=32, n_dense=16):
+    def create_actor_network(self, n_hidden=32, n_dense=8):
         inputs = tf.compat.v1.placeholder(tf.float32, shape=[None, self.s_dim[0], self.s_dim[1]])
         if self.policy == 'dense':
             inputs_reshaped = tf.keras.layers.Flatten()(inputs)
@@ -54,12 +54,12 @@ class Actor(object):
         outputs = tf.squeeze(dist.sample(1), axis=0)
         return inputs, outputs, dist
 
-    def train(self, inputs, outputs, deltas, neglogs):
+    def train(self, inputs, outputs, advantages, neglogs):
         with self.graph.as_default():
             return self.sess.run([self.optimize, self.summary], feed_dict={
                 self.inputs: inputs,
                 self.outputs: outputs,
-                self.deltas: deltas,
+                self.advantages: advantages,
                 self.old_neglog: neglogs
             })
 
@@ -92,8 +92,8 @@ class Critic(object):
             with self.sess.as_default():
 
                 self.inputs, self.values = self.create_critic_network()
-                self.targets = tf.compat.v1.placeholder(tf.float32, shape=[None, self.a_dim])
-                self.old_values = tf.placeholder(tf.float32, [None, self.a_dim])
+                self.targets = tf.compat.v1.placeholder(tf.float32, shape=[None, 1])
+                self.old_values = tf.placeholder(tf.float32, [None, 1])
 
                 values_clipped = self.old_values + tf.clip_by_value(self.values - self.old_values, - self.clip_range, self.clip_range)
                 loss_unclipped = tf.square(self.values - self.targets)
@@ -105,7 +105,7 @@ class Critic(object):
                 loss_summary = tf.compat.v1.summary.scalar("Critic/Loss", self.loss)
                 self.summary = tf.compat.v1.summary.merge([target_summary, loss_summary])
 
-    def create_critic_network(self, n_hidden=32, n_dense=16):
+    def create_critic_network(self, n_hidden=32, n_dense=8):
         inputs = tf.compat.v1.placeholder(tf.float32, shape=[None, self.s_dim[0], self.s_dim[1]])
         if self.policy == 'dense':
             inputs_reshaped = tf.keras.layers.Flatten()(inputs)
@@ -123,7 +123,7 @@ class Critic(object):
             rnn_output = tf.keras.layers.RNN(lstm_cell)(inputs)
             hidden = tf.keras.layers.Flatten()(rnn_output)
         dense = tf.keras.layers.Dense(units=n_dense, activation=tf.nn.relu)(hidden)
-        values = tf.keras.layers.Dense(units=self.a_dim, activation=None)(dense)
+        values = tf.keras.layers.Dense(units=1, activation=None)(dense)
         return inputs, values
 
     def train(self, inputs, targets, values):

@@ -22,7 +22,7 @@ class Actor(object):
             with self.sess.as_default():
 
                 self.inputs, self.outputs, self.norm_dist, self.mu, self.sigma = self.create_actor_network()
-                self.deltas = tf.compat.v1.placeholder(tf.float32, shape=[None, self.a_dim])
+                self.deltas = tf.compat.v1.placeholder(tf.float32, shape=[None, 1])
                 self.loss = - tf.reduce_mean(tf.log(self.norm_dist.prob(self.outputs) + 1e-5) * self.deltas)
                 self.optimize = tf.compat.v1.train.AdamOptimizer(self.learning_rate).minimize(self.loss)
                 loss_summary = tf.compat.v1.summary.scalar("Actor/Loss", self.loss)
@@ -64,7 +64,7 @@ class Actor(object):
             sigma = tf.nn.softplus(sigma) + 1e-5
         norm_dist = tf.contrib.distributions.Normal(mu, sigma)
         outputs = tf.squeeze(norm_dist.sample(1), axis=0)
-        outputs = tf.clip_by_value(outputs, 0, self.action_bound)
+        outputs = tf.clip_by_value(outputs, self.action_bound[0], self.action_bound[1])
         return inputs, outputs, norm_dist, mu, sigma
 
     def stream(self, hidden, n_dense):

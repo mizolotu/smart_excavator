@@ -140,6 +140,7 @@ if __name__ == '__main__':
     user_input_file = 'user_input.txt'
 
     levels = []
+    dig_emp_stats = []
     X = []
     dig_start_point = []
     emp_start_point = []
@@ -158,6 +159,9 @@ if __name__ == '__main__':
             if i == 0:
                 generate_user_input(user_input_file, cycle)
             dig_i, emp_i, to_dig_i, to_emp_i = partition_cycle(cycle)
+            dig_emp_stats.append(
+                [fi, i, dig_i[0], dig_i[-1], emp_i[0], emp_i[-1]]
+            )
             task_i = [
                 dig_i,
                 emp_i,
@@ -166,6 +170,7 @@ if __name__ == '__main__':
             ]
             n_steps = 32
             tasks = []
+            dig_emp = []
             for t_i in task_i:
                 tasks_i = {'t': cycle['t'][t_i], 'x': cycle['x'][t_i]}
                 tasks.append(resample_cycle_points(tasks_i, np.minimum(len(t_i), n_steps)))
@@ -205,3 +210,4 @@ if __name__ == '__main__':
         pickle.dump(levels, f)
         pickle.dump(key_points, f)
         pickle.dump(key_stats, f)
+        pickle.dump(dig_emp_stats, f)
