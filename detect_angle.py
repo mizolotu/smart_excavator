@@ -113,7 +113,7 @@ if __name__ == '__main__':
         except Exception as e:
             print(e)
             angle_detection_session.run(tf.compat.v1.global_variables_initializer())
-            angler.train(X_train, Y_train, X_test, Y_test, epochs=1000, batch=1000)
+            angler.train(X_train, Y_train, epochs=1000, batch=1000)
             saver.save(angle_detection_session, a_model_file, write_meta_graph=False)
 
     P_test = angler.predict(X_test)
