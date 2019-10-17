@@ -34,6 +34,8 @@ if __name__ == '__main__':
 
     X = []
     A = []
+    X1 = []
+    A1 = []
     for i in range(len(level_points)):
         px = level_points[i][0]
         pt = level_points[i][1]
@@ -55,6 +57,15 @@ if __name__ == '__main__':
             X.append(points_resampled)
             A.append([dig_a_r, emp_a_r])
 
+            # test data
+
+            r = np.random.rand() * 100 - 50
+            points_resampled[:, 0] += r
+            dig_a_r = dig_a + r
+            emp_a_r = emp_a + r
+            X1.append(points_resampled)
+            A1.append([dig_a_r, emp_a_r])
+
     # standardize features
 
     x_min = np.array([-360.0, 3.9024162648733514, 13.252630737652677, 16.775050853637147])
@@ -66,7 +77,10 @@ if __name__ == '__main__':
     n_features = 4
 
     X_train = np.zeros((len(X), n_steps, n_features))
-    Y_train = np.zeros((len(X), 2))
+    Y_train = np.zeros((len(A), 2))
+
+    X_test = np.zeros((len(X1), n_steps, n_features))
+    Y_test = np.zeros((len(A1), 2))
 
     for i in range(len(X)):
 
@@ -77,12 +91,19 @@ if __name__ == '__main__':
 
     print(X_train.shape, Y_train.shape)
 
+    for i in range(len(X1)):
+
+        n = X1[i].shape[0]
+        X_test[i, :n, :] = mm.transform(X1[i])
+        Y_test[i, 0] = (A1[i][0] - x_min[0]) / (x_max[0] - x_min[0])
+        Y_test[i, 1] = (A1[i][1] - x_min[0]) / (x_max[0] - x_min[0])
+
     angler = AngleDetector(
         angle_detection_graph,
         angle_detection_session,
         n_steps,
         n_features,
-        lr=0.0001
+        lr=0.001
     )
 
     with angle_detection_graph.as_default():
@@ -92,9 +113,10 @@ if __name__ == '__main__':
         except Exception as e:
             print(e)
             angle_detection_session.run(tf.compat.v1.global_variables_initializer())
-            angler.train(X_train, Y_train, epochs=10000, batch=1000)
+            angler.train(X_train, Y_train, epochs=100, batch=1000)
             saver.save(angle_detection_session, a_model_file, write_meta_graph=False)
 
+    P_test = angler.predict(X_test)
 
 
 
