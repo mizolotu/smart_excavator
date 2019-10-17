@@ -36,7 +36,9 @@ if __name__ == '__main__':
     A = []
     X1 = []
     A1 = []
-    for i in range(len(level_points)):
+    A2 = []
+
+    for i in [0,1]: # range(len(level_points)):
         print(i)
         px = level_points[i][0]
         pt = level_points[i][1]
@@ -51,72 +53,68 @@ if __name__ == '__main__':
             x = px[j:, :]
             t = pt[j:, :]
             points_resampled, time_step = resample_cycle_points({'x': x, 't': t}, time_step=0.25)
-            n_points = points_resampled.shape[0]
             points_resampled[:, 0] += r
-            dig_a_r = dig_a + r
-            emp_a_r = emp_a + r
-            X.append(points_resampled)
-            A.append([dig_a_r, emp_a_r])
-
             dig_a_r = dig_a + r
             emp_a_r = emp_a + r
             a_min = np.min(points_resampled[:, 0])
             a_max = np.max(points_resampled[:, 0])
             a_step = 0.5
             a_window = 1
+            X1.append([])
+            A1.append(dig_a_r)
+            A2.append(emp_a_r)
             for a in np.arange(a_min, a_max, a_step):
                 idx = np.where((points_resampled[:, 0] > a - a_window) & (points_resampled[:, 0] < a + a_window))[0]
                 if len(idx) > 0:
-                    X1.append(points_resampled[idx, :])
+                    X.append(points_resampled[idx, 1:])
+                    X1[-1].append(points_resampled[idx, :])
                     if a > dig_a_r - a_window and a < dig_a_r + a_window:
-                        A1.append([0, 1, 0])
+                        A.append([0, 1, 0])
                     elif a > emp_a_r - a_window and a < emp_a_r + a_window:
-                        A1.append([0, 0, 1])
+                        A.append([0, 0, 1])
                     else:
-                        A1.append([1, 0, 0])
+                        A.append([1, 0, 0])
 
     # standardize features
 
-    x_min = np.array([-360.0, 3.9024162648733514, 13.252630737652677, 16.775050853637147])
-    x_max = np.array([360.0, 812.0058600513476, 1011.7128949856826, 787.6024456729566])
+    x_min = np.array([3.9024162648733514, 13.252630737652677, 16.775050853637147])
+    x_max = np.array([812.0058600513476, 1011.7128949856826, 787.6024456729566])
     X_to_std = np.vstack([np.vstack(X), x_min, x_max])
     mm = MinMaxScaler().fit(X_to_std)
 
     n_steps = np.max([x.shape[0] for x in X])
-    n_features = 4
+    n_features = 3
+    n_classes = 3
 
-    X_train = np.zeros((len(X), n_steps, n_features))
-    Y_train = np.zeros((len(A), 2))
+    n_train = len(X)
+    X_train = np.zeros((n_train, n_steps, n_features))
+    Y_train = np.zeros((n_train, 3))
 
-    n_steps1 = np.max([x.shape[0] for x in X1])
-    n_features1= 3
-
-    X_train1 = np.zeros((len(X1), n_steps1, n_features1))
-    Y_train1 = np.zeros((len(A1), 3))
+    n_test0 = len(X1)
+    n_test1 = np.max([len(x) for x in X1])
+    X_test = np.zeros((n_test0, n_test1, n_steps, n_features))
 
     print(X_train.shape, Y_train.shape)
-    print(X_train1.shape, Y_train1.shape)
+    print(X_test.shape)
 
-    for i in range(len(X)):
-
+    for i in range(n_train):
         n = X[i].shape[0]
         X_train[i, :n, :] = mm.transform(X[i])
-        Y_train[i, 0] = (A[i][0] - x_min[0]) / (x_max[0] - x_min[0])
-        Y_train[i, 1] = (A[i][1] - x_min[0]) / (x_max[0] - x_min[0])
+        Y_train[i, :] = A[i]
 
-    for i in range(len(X1)):
-
-        n = X1[i].shape[0]
-        X_train1[i, :n, :] = mm.transform(X1[i])[:, 1:]
-        Y_train1[i, :] = A1[i]
+    for i in range(n_test0):
+        n = len(X1[i])
+        for j in range(n):
+            m = X1[i][j].shape[0]
+            X_test[i, j, :m, :] = mm.transform(X1[i][j][:, 1:])
 
     angler = AngleDetector(
         angle_detection_graph,
         angle_detection_session,
-        n_steps1,
-        n_features1,
-        lr=0.0001,
-        activation='softmax'
+        n_steps,
+        n_features,
+        n_classes,
+        lr=0.00001,
     )
 
     with angle_detection_graph.as_default():
@@ -126,8 +124,45 @@ if __name__ == '__main__':
         except Exception as e:
             print(e)
             angle_detection_session.run(tf.compat.v1.global_variables_initializer())
-            angler.train(X_train1, Y_train1, epochs=10000, batch=10000)
+            angler.train(X_train, Y_train, epochs=100000, batch=10000)
             saver.save(angle_detection_session, a_model_file, write_meta_graph=False)
+
+    da = []
+    df = 0
+    dp = []
+    ea = []
+    ep = []
+    ef = 0
+    for i in range(n_test0):
+        p = angler.predict(X_test[i, :, :, :])
+        l = np.argmax(p, axis=1)
+        d_idx = np.array(np.where(l == 1)[0], dtype=int)
+        e_idx = np.array(np.where(l == 2)[0], dtype=int)
+        if len(d_idx) > 0:
+            d = []
+            for idx in d_idx:
+                d.append(np.mean(X1[i][idx][:, 0]))
+            dp.append(np.mean(d))
+            da.append(A1[idx])
+        else:
+            df += 1
+        if len(e_idx) > 0:
+            e = []
+            for idx in e_idx:
+                e.append(np.mean(X1[i][idx][:, 0]))
+            ep.append(np.mean(e))
+            ea.append(A2[i])
+        else:
+            ef += 1
+    d_error = np.abs(np.array(da) - np.array(dp))
+    e_error = np.abs(np.array(ea) - np.array(ep))
+    print(np.min(d_error), np.max(d_error), np.mean(d_error), float(df) / n_test0)
+    print(np.min(e_error), np.max(e_error), np.mean(e_error), float(ef) / n_test0)
+
+
+
+
+
 
 
 
