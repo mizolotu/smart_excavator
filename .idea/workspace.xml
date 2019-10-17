@@ -2,19 +2,9 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="98635c05-4f2f-4f58-8ea5-7a8fa8469745" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/detect_angle.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/a2c.py" beforeDir="false" afterPath="$PROJECT_DIR$/a2c.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/level_points.pkl" beforeDir="false" afterPath="$PROJECT_DIR$/data/level_points.pkl" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/excavator_client.py" beforeDir="false" afterPath="$PROJECT_DIR$/excavator_client.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/excavator_server.py" beforeDir="false" afterPath="$PROJECT_DIR$/excavator_server.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/excavator_train_supervised.py" beforeDir="false" afterPath="$PROJECT_DIR$/excavator_train_supervised.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/generate_levels.py" beforeDir="false" afterPath="$PROJECT_DIR$/generate_levels.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/memories/mover.pkl" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/memories/planner.pkl" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/ppo.py" beforeDir="false" afterPath="$PROJECT_DIR$/ppo.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/detect_angle.py" beforeDir="false" afterPath="$PROJECT_DIR$/detect_angle.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/sequence_generator.py" beforeDir="false" afterPath="$PROJECT_DIR$/sequence_generator.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/user_input/user_input.txt" beforeDir="false" afterPath="$PROJECT_DIR$/user_input/user_input.txt" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />

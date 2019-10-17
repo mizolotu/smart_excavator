@@ -83,13 +83,19 @@ class AngleDetector(object):
                 self.loss = tf.compat.v1.losses.mean_squared_error(labels=self.outputs, predictions=self.prediction)
                 self.optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate=lr).minimize(self.loss)
 
-    def train(self, inputs, outputs, epochs=100000):
+    def train(self, inputs, outputs, epochs=100000, batch=32):
         print('Training on {0} samples:'.format(inputs.shape[0]))
         for e in range(epochs):
-            _, loss = self.sess.run([self.optimizer, self.loss], feed_dict={
-                self.inputs: inputs,
-                self.outputs: outputs
-            })
+            loss = 0
+            count = 0
+            for j in range(0, inputs.shape[0], batch):
+                _, l = self.sess.run([self.optimizer, self.loss], feed_dict={
+                    self.inputs: inputs[j : j + batch, :],
+                    self.outputs: outputs[j : j + batch, :]
+                })
+                loss += l
+                count += 1
+            loss = loss / count
             if (e + 1) % int(epochs / 100) == 0:
                 print('Loss at epoch {0}: {1}'.format(e + 1, loss))
 

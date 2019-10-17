@@ -75,6 +75,8 @@ if __name__ == '__main__':
         Y_train[i, 0] = (A[i][0] - x_min[0]) / (x_max[0] - x_min[0])
         Y_train[i, 1] = (A[i][1] - x_min[0]) / (x_max[0] - x_min[0])
 
+    print(X_train.shape, Y_train.shape)
+
     angler = AngleDetector(
         angle_detection_graph,
         angle_detection_session,
@@ -90,7 +92,7 @@ if __name__ == '__main__':
         except Exception as e:
             print(e)
             angle_detection_session.run(tf.compat.v1.global_variables_initializer())
-            angler.train(X_train, Y_train, epochs=10000)
+            angler.train(X_train, Y_train, epochs=10000, batch=1000)
             saver.save(angle_detection_session, a_model_file, write_meta_graph=False)
 
 
