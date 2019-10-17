@@ -49,7 +49,7 @@ if __name__ == '__main__':
             r = np.random.rand() * 100 - 50
             x = px[j:, :]
             t = pt[j:, :]
-            points_resampled, time_step = resample_cycle_points({'x': x, 't': t}, time_step=0.1)
+            points_resampled, time_step = resample_cycle_points({'x': x, 't': t}, time_step=0.25)
             n_points = points_resampled.shape[0]
             points_resampled[:, 0] += r
             dig_a_r = dig_a + r
@@ -113,7 +113,7 @@ if __name__ == '__main__':
         except Exception as e:
             print(e)
             angle_detection_session.run(tf.compat.v1.global_variables_initializer())
-            angler.train(X_train, Y_train, epochs=1000, batch=1000)
+            angler.train(X_train, Y_train, epochs=1000, batch=12304)
             saver.save(angle_detection_session, a_model_file, write_meta_graph=False)
 
     P_test = angler.predict(X_test)
