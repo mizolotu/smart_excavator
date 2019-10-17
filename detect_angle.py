@@ -59,7 +59,7 @@ if __name__ == '__main__':
 
             # test data
 
-            r = np.random.rand() * 100 - 50
+            r = np.random.rand() * 180 - 90
             points_resampled[:, 0] += r
             dig_a_r = dig_a + r
             emp_a_r = emp_a + r
@@ -103,7 +103,7 @@ if __name__ == '__main__':
         angle_detection_session,
         n_steps,
         n_features,
-        lr=0.001
+        lr=0.0001
     )
 
     with angle_detection_graph.as_default():
@@ -113,7 +113,7 @@ if __name__ == '__main__':
         except Exception as e:
             print(e)
             angle_detection_session.run(tf.compat.v1.global_variables_initializer())
-            angler.train(X_train, Y_train, epochs=1000, batch=12304)
+            angler.train(X_train, Y_train, epochs=10000, batch=X_train.shape[0])
             saver.save(angle_detection_session, a_model_file, write_meta_graph=False)
 
     P_test = angler.predict(X_test)
