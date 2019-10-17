@@ -115,7 +115,7 @@ if __name__ == '__main__':
         angle_detection_session,
         n_steps1,
         n_features1,
-        lr=0.001,
+        lr=0.0001,
         activation='softmax'
     )
 
@@ -126,7 +126,7 @@ if __name__ == '__main__':
         except Exception as e:
             print(e)
             angle_detection_session.run(tf.compat.v1.global_variables_initializer())
-            angler.train(X_train1, Y_train1, epochs=1000, batch=4096)
+            angler.train(X_train1, Y_train1, epochs=10000, batch=10000)
             saver.save(angle_detection_session, a_model_file, write_meta_graph=False)
 
 
