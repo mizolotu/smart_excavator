@@ -5,6 +5,7 @@
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/detect_angle.py" beforeDir="false" afterPath="$PROJECT_DIR$/detect_angle.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/excavator_server.py" beforeDir="false" afterPath="$PROJECT_DIR$/excavator_server.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/sequence_generator.py" beforeDir="false" afterPath="$PROJECT_DIR$/sequence_generator.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/user_input/user_input.txt" beforeDir="false" afterPath="$PROJECT_DIR$/user_input/user_input.txt" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />

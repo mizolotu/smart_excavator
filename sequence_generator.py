@@ -67,7 +67,7 @@ class SequenceGenerator(object):
 
 class AngleDetector(object):
 
-    def __init__(self, graph, sess, n_steps, n_features, n_hidden=64, n_dense=32, lr=0.0001):
+    def __init__(self, graph, sess, n_steps, n_features, n_hidden=64, n_dense=32, lr=0.0001, activation='sigmoid'):
 
         self.graph = graph
         self.sess = sess
@@ -75,13 +75,19 @@ class AngleDetector(object):
         with self.graph.as_default():
             with self.sess.as_default():
                 self.inputs = tf.compat.v1.placeholder(tf.float32, shape=[None, n_steps, n_features])
-                self.outputs = tf.compat.v1.placeholder(tf.float32, shape=[None, 2])
+                if activation == 'sigmoid':
+                    self.outputs = tf.compat.v1.placeholder(tf.float32, shape=[None, 2])
+                elif activation == 'softmax':
+                    self.outputs = tf.compat.v1.placeholder(tf.float32, shape=[None, 3])
                 lstm_cell = tf.keras.layers.LSTMCell(units=n_hidden)
                 rnn_output = tf.keras.layers.RNN(lstm_cell)(self.inputs)
                 hidden = tf.keras.layers.Flatten()(rnn_output)
                 dropout = tf.keras.layers.Dropout(0.5)(hidden)
                 dense = tf.keras.layers.Dense(n_dense, activation=tf.nn.relu)(dropout)
-                self.prediction = tf.keras.layers.Dense(units=2, activation=tf.nn.sigmoid)(dense)
+                if activation == 'sigmoid':
+                    self.prediction = tf.keras.layers.Dense(units=2, activation=tf.nn.sigmoid)(dense)
+                elif activation == 'softmax':
+                    self.prediction = tf.keras.layers.Dense(units=3, activation=tf.nn.softmax)(dense)
                 self.loss = tf.compat.v1.losses.mean_squared_error(labels=self.outputs, predictions=self.prediction)
                 self.optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate=lr).minimize(self.loss)
 

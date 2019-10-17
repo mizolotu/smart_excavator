@@ -37,6 +37,7 @@ if __name__ == '__main__':
     X1 = []
     A1 = []
     for i in range(len(level_points)):
+        print(i)
         px = level_points[i][0]
         pt = level_points[i][1]
         s = stats[i]
@@ -57,14 +58,22 @@ if __name__ == '__main__':
             X.append(points_resampled)
             A.append([dig_a_r, emp_a_r])
 
-            # test data
-
-            r = np.random.rand() * 180 - 90
-            points_resampled[:, 0] += r
             dig_a_r = dig_a + r
             emp_a_r = emp_a + r
-            X1.append(points_resampled)
-            A1.append([dig_a_r, emp_a_r])
+            a_min = np.min(points_resampled[:, 0])
+            a_max = np.max(points_resampled[:, 0])
+            a_step = 0.5
+            a_window = 1
+            for a in np.arange(a_min, a_max, a_step):
+                idx = np.where((points_resampled[:, 0] > a - a_window) & (points_resampled[:, 0] < a + a_window))[0]
+                if len(idx) > 0:
+                    X1.append(points_resampled[idx, :])
+                    if a > dig_a_r - a_window and a < dig_a_r + a_window:
+                        A1.append([0, 1, 0])
+                    elif a > emp_a_r - a_window and a < emp_a_r + a_window:
+                        A1.append([0, 0, 1])
+                    else:
+                        A1.append([1, 0, 0])
 
     # standardize features
 
@@ -79,8 +88,14 @@ if __name__ == '__main__':
     X_train = np.zeros((len(X), n_steps, n_features))
     Y_train = np.zeros((len(A), 2))
 
-    X_test = np.zeros((len(X1), n_steps, n_features))
-    Y_test = np.zeros((len(A1), 2))
+    n_steps1 = np.max([x.shape[0] for x in X1])
+    n_features1= 3
+
+    X_train1 = np.zeros((len(X1), n_steps1, n_features1))
+    Y_train1 = np.zeros((len(A1), 3))
+
+    print(X_train.shape, Y_train.shape)
+    print(X_train1.shape, Y_train1.shape)
 
     for i in range(len(X)):
 
@@ -89,21 +104,19 @@ if __name__ == '__main__':
         Y_train[i, 0] = (A[i][0] - x_min[0]) / (x_max[0] - x_min[0])
         Y_train[i, 1] = (A[i][1] - x_min[0]) / (x_max[0] - x_min[0])
 
-    print(X_train.shape, Y_train.shape)
-
     for i in range(len(X1)):
 
         n = X1[i].shape[0]
-        X_test[i, :n, :] = mm.transform(X1[i])
-        Y_test[i, 0] = (A1[i][0] - x_min[0]) / (x_max[0] - x_min[0])
-        Y_test[i, 1] = (A1[i][1] - x_min[0]) / (x_max[0] - x_min[0])
+        X_train1[i, :n, :] = mm.transform(X1[i])[:, 1:]
+        Y_train1[i, :] = A1[i]
 
     angler = AngleDetector(
         angle_detection_graph,
         angle_detection_session,
-        n_steps,
-        n_features,
-        lr=0.0001
+        n_steps1,
+        n_features1,
+        lr=0.001,
+        activation='softmax'
     )
 
     with angle_detection_graph.as_default():
@@ -113,10 +126,8 @@ if __name__ == '__main__':
         except Exception as e:
             print(e)
             angle_detection_session.run(tf.compat.v1.global_variables_initializer())
-            angler.train(X_train, Y_train, epochs=10000, batch=X_train.shape[0])
+            angler.train(X_train, Y_train, epochs=1000, batch=X_train.shape[0])
             saver.save(angle_detection_session, a_model_file, write_meta_graph=False)
-
-    P_test = angler.predict(X_test)
 
 
 
