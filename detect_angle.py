@@ -38,7 +38,7 @@ if __name__ == '__main__':
     A1 = []
     A2 = []
 
-    for i in range(len(level_points)):
+    for i in [0, 1]: #range(len(level_points)):
         print(i)
         px = level_points[i][0]
         pt = level_points[i][1]
