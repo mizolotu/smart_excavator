@@ -2,7 +2,9 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="98635c05-4f2f-4f58-8ea5-7a8fa8469745" name="Default Changelist" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/detect_angle.py" beforeDir="false" afterPath="$PROJECT_DIR$/detect_angle.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/user_input/user_input.txt" beforeDir="false" afterPath="$PROJECT_DIR$/user_input/user_input.txt" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -41,11 +43,14 @@
       </list>
     </option>
   </component>
-  <component name="RunManager" selected="Python.detect_angle">
+  <component name="RunManager" selected="Python.excavator_server">
     <configuration name="detect_angle" type="PythonConfigurationType" factoryName="Python" temporary="true">
       <module name="SmartExcavator" />
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
       <option name="SDK_HOME" value="" />
       <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
       <option name="IS_MODULE_SDK" value="true" />
@@ -153,8 +158,8 @@
     </list>
     <recent_temporary>
       <list>
-        <item itemvalue="Python.detect_angle" />
         <item itemvalue="Python.excavator_server" />
+        <item itemvalue="Python.detect_angle" />
         <item itemvalue="Python.generate_levels" />
         <item itemvalue="Python.excavator_train_supervised" />
         <item itemvalue="Python.dqn" />
