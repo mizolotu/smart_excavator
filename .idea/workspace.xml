@@ -41,14 +41,11 @@
       </list>
     </option>
   </component>
-  <component name="RunManager" selected="Python.excavator_server">
+  <component name="RunManager" selected="Python.detect_angle">
     <configuration name="detect_angle" type="PythonConfigurationType" factoryName="Python" temporary="true">
       <module name="SmartExcavator" />
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
       <option name="SDK_HOME" value="" />
       <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
       <option name="IS_MODULE_SDK" value="true" />
@@ -156,8 +153,8 @@
     </list>
     <recent_temporary>
       <list>
-        <item itemvalue="Python.excavator_server" />
         <item itemvalue="Python.detect_angle" />
+        <item itemvalue="Python.excavator_server" />
         <item itemvalue="Python.generate_levels" />
         <item itemvalue="Python.excavator_train_supervised" />
         <item itemvalue="Python.dqn" />
