@@ -81,8 +81,8 @@ class AngleDetector(object):
                 hidden = tf.keras.layers.Flatten()(rnn_output)
                 dropout = tf.keras.layers.Dropout(0.5)(hidden)
                 dense = tf.keras.layers.Dense(n_dense, activation=tf.nn.relu)(dropout)
-                self.prediction = tf.keras.layers.Dense(units=3, activation=tf.nn.softmax)(dense)
-                self.loss = tf.compat.v1.losses.softmax_cross_entropy(self.outputs, self.prediction)
+                self.prediction = tf.keras.layers.Dense(units=3, activation=tf.nn.sigmoid)(dense)
+                self.loss = tf.compat.v1.losses.sigmoid_cross_entropy(self.outputs, self.prediction)
                 self.optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate=lr).minimize(self.loss)
 
     def train(self, inputs, outputs, epochs=100000, batch=32):
