@@ -38,7 +38,7 @@ if __name__ == '__main__':
     A1 = []
     A2 = []
 
-    for i in [0, 1] : #range(len(level_points)):
+    for i in range(len(level_points)):
         print(i)
         px = level_points[i][0]
         pt = level_points[i][1]
@@ -114,7 +114,7 @@ if __name__ == '__main__':
         n_steps,
         n_features,
         n_classes,
-        lr=0.001,
+        lr=0.0001,
     )
 
     with angle_detection_graph.as_default():
@@ -124,7 +124,7 @@ if __name__ == '__main__':
         except Exception as e:
             print(e)
             angle_detection_session.run(tf.compat.v1.global_variables_initializer())
-            angler.train(X_train, Y_train, epochs=10000, batch=10000)
+            angler.train(X_train, Y_train, epochs=100000, batch=10000)
             saver.save(angle_detection_session, a_model_file, write_meta_graph=False)
 
     da = []

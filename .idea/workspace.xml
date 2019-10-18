@@ -2,6 +2,8 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="98635c05-4f2f-4f58-8ea5-7a8fa8469745" name="Default Changelist" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/detect_angle.py" beforeDir="false" afterPath="$PROJECT_DIR$/detect_angle.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/sequence_generator.py" beforeDir="false" afterPath="$PROJECT_DIR$/sequence_generator.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
