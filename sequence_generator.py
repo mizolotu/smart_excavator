@@ -67,7 +67,7 @@ class SequenceGenerator(object):
 
 class AngleDetector(object):
 
-    def __init__(self, graph, sess, n_steps, n_features, n_classes, n_hidden=64, n_dense=32, lr=0.0001):
+    def __init__(self, graph, sess, n_steps, n_features, n_classes, n_hidden=128, n_dense=64, lr=0.0001):
 
         self.graph = graph
         self.sess = sess

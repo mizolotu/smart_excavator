@@ -58,8 +58,8 @@ if __name__ == '__main__':
             emp_a_r = emp_a + r
             a_min = np.min(points_resampled[:, 0])
             a_max = np.max(points_resampled[:, 0])
-            a_step = 0.5
-            a_window = 1
+            a_step = 0.25
+            a_window = 0.5
             X1.append([])
             A1.append(dig_a_r)
             A2.append(emp_a_r)
@@ -130,7 +130,7 @@ if __name__ == '__main__':
         except Exception as e:
             print(e)
             angle_detection_session.run(tf.compat.v1.global_variables_initializer())
-            angler.train(X_train, Y_train, epochs=100000, batch=10000)
+            angler.train(X_train, Y_train, epochs=1000000, batch=100000)
             saver.save(angle_detection_session, a_model_file, write_meta_graph=False)
 
     da = []
