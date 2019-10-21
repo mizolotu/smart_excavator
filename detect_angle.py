@@ -66,8 +66,14 @@ if __name__ == '__main__':
             for a in np.arange(a_min, a_max, a_step):
                 idx = np.where((points_resampled[:, 0] > a - a_window) & (points_resampled[:, 0] < a + a_window))[0]
                 if len(idx) > 0:
-                    X.append(points_resampled[idx, 1:])
-                    X1[-1].append(points_resampled[idx, :])
+                    feature_vector = np.vstack([
+                        np.mean(points_resampled[idx, :], axis=0),
+                        np.std(points_resampled[idx, :], axis=0),
+                        np.min(points_resampled[idx, :], axis=0),
+                        np.max(points_resampled[idx, :], axis=0),
+                    ])
+                    X.append(feature_vector[:, 1:])
+                    X1[-1].append(feature_vector)
                     if a > dig_a_r - a_window and a < dig_a_r + a_window:
                         A.append([0, 1, 0])
                     elif a > emp_a_r - a_window and a < emp_a_r + a_window:
@@ -134,22 +140,24 @@ if __name__ == '__main__':
     ep = []
     ef = 0
     for i in range(n_test0):
-        p = angler.predict(X_test[i, :, :, :])
+        n = len(X1[i])
+        p = angler.predict(X_test[i, :n, :, :])
         l = np.argmax(p, axis=1)
         d_idx = np.array(np.where(l == 1)[0], dtype=int)
         e_idx = np.array(np.where(l == 2)[0], dtype=int)
         if len(d_idx) > 0:
             d = []
             for idx in d_idx:
-                d.append(np.mean(X1[i][idx][:, 0]))
+                d.append(X1[i][idx][0, 0])
             dp.append(np.mean(d))
             da.append(A1[idx])
+            print(d, A1[idx])
         else:
             df += 1
         if len(e_idx) > 0:
             e = []
             for idx in e_idx:
-                e.append(np.mean(X1[i][idx][:, 0]))
+                e.append(X1[i][idx][0, 0])
             ep.append(np.mean(e))
             ea.append(A2[i])
         else:

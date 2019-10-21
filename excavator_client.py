@@ -35,7 +35,8 @@ component_controls = [p.split(' ')[0] for p in data_names['controls']]
 # thresholds
 
 move_thr = np.array([2.5, 2.5, 2.5, 2.5])
-time_thr = 0.01
+time_thr = 0.05
+control_gain = 600
 
 # Dimensions
 
@@ -46,7 +47,7 @@ action_dim = 4
 
 # Other parameters
 
-n_attempts_to_reach_target = 16
+n_attempts_to_reach_target = 64
 n_iterations_stay = 1
 pid_gain_limits = np.vstack([
     100 * np.ones(action_dim),
@@ -71,7 +72,7 @@ def pid_controls(points_list, target, delta_time, integ_prev, gains):
     error_prev = target - points[-2, :]
     d = (p - error_prev) / delta_time
     i = integ_prev + (p + error_prev) / 2 * delta_time
-    controls = - (gains[0, :] * p + gains[1, :] * i + gains[2, :] * d)
+    controls = control_gain *  gains # - (gains[0, :] * p + gains[1, :] * i + gains[2, :] * d)
     return controls, i
 
 def get_status():
@@ -358,10 +359,7 @@ def callScript(deltaTime, simulationTime):
 
                     # increment trajectory index
 
-                    if GObject.data['n_attempts'] >= n_attempts_to_reach_target:
-                        GObject.data['trajectory_idx'] = len(GObject.data['trajectory']) - 1
-                    else:
-                        GObject.data['trajectory_idx'] += 1
+                    GObject.data['trajectory_idx'] += 1
 
                     # switch the target
 
@@ -406,23 +404,24 @@ def callScript(deltaTime, simulationTime):
 
             # if time limit has been reached, we request new PID gains without switching the target
 
-            elif time() - GObject.data['target_set_time'] > time_limit + GObject.data['target_bonus_time'] + np.inf:
+            elif time() - GObject.data['target_set_time'] > time_limit: # + GObject.data['target_bonus_time']:
 
                 # increment attempt count
 
+                last_delta = deltas[-1]
                 GObject.data['n_attempts'] += 1
 
                 # remember start and end delta for mover score calculation
 
                 delta_start = GObject.data['delta_start']
-                delta_end = list(deltas[-1])
+                delta_end = list(last_delta)
 
                 # request new PID control gains
 
-                last_delta = deltas[-1]
                 time_spent = time() - GObject.data['target_set_time']
                 if GObject.data['n_attempts'] >= n_attempts_to_reach_target:
                     done = True
+                    GObject.data['n_attempts'] = 0
                 else:
                     done = False
                 if np.all(np.abs(last_delta) <= move_thr):
