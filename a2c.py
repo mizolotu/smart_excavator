@@ -1,5 +1,5 @@
-import numpy as np
 import tensorflow as tf
+from math import pi
 
 # Actor model
 
@@ -22,13 +22,16 @@ class Actor(object):
             with self.sess.as_default():
 
                 self.inputs, self.outputs, self.norm_dist, self.mu, self.sigma = self.create_actor_network()
+                self.actions = tf.compat.v1.placeholder(tf.float32, shape=[None, a_dim])
                 self.deltas = tf.compat.v1.placeholder(tf.float32, shape=[None, 1])
-                self.loss = - tf.reduce_mean(tf.log(self.norm_dist.prob(self.outputs) + 1e-5) * self.deltas)
+                self.entropy = tf.reduce_mean(-(tf.log(2 * pi * tf.square(self.sigma) + 1) / 2)) # this is negative entropy
+                self.loss = - tf.reduce_mean(tf.log(self.norm_dist.prob(self.actions) + 1e-5) * self.deltas) + 0.01 * self.entropy
                 self.optimize = tf.compat.v1.train.AdamOptimizer(self.learning_rate).minimize(self.loss)
                 loss_summary = tf.compat.v1.summary.scalar("Actor/Loss", self.loss)
+                entropy_summary = tf.compat.v1.summary.scalar("Actor/Entropy", self.entropy)
                 mu_summary = tf.compat.v1.summary.histogram("Action mu", self.mu)
                 sigma_summary = tf.compat.v1.summary.histogram("Action sigma", self.sigma)
-                self.summary = tf.compat.v1.summary.merge([loss_summary, mu_summary, sigma_summary])
+                self.summary = tf.compat.v1.summary.merge([entropy_summary, loss_summary, mu_summary, sigma_summary])
 
     def create_actor_network(self, n_hidden=64, n_dense=256):
         inputs = tf.compat.v1.placeholder(tf.float32, shape=[None, self.s_dim[0], self.s_dim[1]])
@@ -76,11 +79,11 @@ class Actor(object):
         sigma = tf.nn.softplus(sigma) + 1e-5
         return mu, sigma
 
-    def train(self, inputs, outputs, deltas):
+    def train(self, inputs, actions, deltas):
         with self.graph.as_default():
             return self.sess.run([self.optimize, self.summary], feed_dict={
                 self.inputs: inputs,
-                self.outputs: outputs,
+                self.actions: actions,
                 self.deltas: deltas
             })
 

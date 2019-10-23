@@ -20,8 +20,11 @@ class ReplayBuffer(object):
         self.buffer = deque()
         random.seed(random_seed)
 
-    def add(self, s, a, r, t, s2):
-        experience = [s, a, r, t, s2, self.max_priority]
+    def add(self, *args):
+        experience = []
+        for arg in args:
+            experience.append(arg)
+        experience.append(self.max_priority)
         self.buffer_q.put(experience)
 
     def size(self):
@@ -42,31 +45,34 @@ class ReplayBuffer(object):
 
         # sample a batch of experience
 
+        batch = []
         n = np.minimum(self.count, batch_size)
-        priorities = np.array([_[5] for _ in self.buffer])
-        sampling_probabilities = priorities / np.sum(priorities)
-        if rnd:
-            idx_batch = np.random.choice(self.count, n, replace=False, p=sampling_probabilities)
-        else:
-            idx_batch = np.arange(n)
-        self.per_b = np.min([1., self.per_b + self.per_b_increment_per_sampling])
-        p_min = np.min(priorities) / np.sum(priorities)
-        max_weight = (p_min * n) ** (-self.per_b)
-        w_batch = np.empty((n, 1), dtype=np.float32)
-        w_batch[:,0] = np.power(n * sampling_probabilities[idx_batch], -self.per_b) / max_weight
-        s_batch = np.array([self.buffer[i][0] for i in idx_batch])
-        a_batch = np.array([self.buffer[i][1] for i in idx_batch])
-        r_batch = np.array([self.buffer[i][2] for i in idx_batch])
-        t_batch = np.array([self.buffer[i][3] for i in idx_batch])
-        s2_batch = np.array([self.buffer[i][4] for i in idx_batch])
-        return s_batch, a_batch, r_batch, t_batch, s2_batch, idx_batch, w_batch
+        if n > 0:
+            last_idx = len(self.buffer[0]) - 1
+            priorities = np.array([_[last_idx] for _ in self.buffer])
+            sampling_probabilities = priorities / np.sum(priorities)
+            if rnd:
+                idx_batch = np.random.choice(self.count, n, replace=False, p=sampling_probabilities)
+            else:
+                idx_batch = np.arange(n)
+            self.per_b = np.min([1., self.per_b + self.per_b_increment_per_sampling])
+            p_min = np.min(priorities) / np.sum(priorities)
+            max_weight = (p_min * n) ** (-self.per_b)
+            w_batch = np.empty((n, 1), dtype=np.float32)
+            w_batch[:, 0] = np.power(n * sampling_probabilities[idx_batch], -self.per_b) / max_weight
+            for j in range(last_idx):
+                batch.append(np.array([self.buffer[i][j] for i in idx_batch]))
+            batch.append(idx_batch)
+            batch.append(w_batch)
+        return batch
 
     def update_priorities(self, idx, abs_errors):
         abs_errors += self.per_e
         clipped_error = np.minimum(abs_errors, self.absolute_error_upper)
         priorities = np.power(clipped_error, self.per_a)
-        for i,j in enumerate(idx):
-            self.buffer[j][5] = priorities[i]
+        last_idx = len(self.buffer[0]) - 1
+        for i, j in enumerate(idx):
+            self.buffer[j][last_idx] = priorities[i]
 
     def clear(self):
         self.buffer.clear()

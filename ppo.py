@@ -4,7 +4,7 @@ import tensorflow as tf
 
 class Actor(object):
 
-    def __init__(self, graph, sess, s_dim, a_dim, lr, clip_range, policy='dense'):
+    def __init__(self, graph, sess, s_dim, a_dim, lr, clip_range, policy='dense', n_hidden=32, n_dense=8):
         self.graph = graph
         self.sess = sess
         self.s_dim = s_dim
@@ -18,20 +18,26 @@ class Actor(object):
         with self.graph.as_default():
             with self.sess.as_default():
 
-                self.inputs, self.outputs, self.dist = self.create_actor_network()
+                self.inputs, self.outputs, self.dist = self.create_actor_network(n_hidden, n_dense)
+                self.actions = tf.compat.v1.placeholder(tf.float32, shape=[None, a_dim])
                 self.advantages = tf.compat.v1.placeholder(tf.float32, shape=[None, 1])
-                self.old_neglog = tf.compat.v1.placeholder(tf.float32, shape=[None, 1])
+                self.old_neglogs = tf.compat.v1.placeholder(tf.float32, shape=[None, 1])
 
-                self.neglog = - self.dist.log_prob(self.outputs)
-                ratio = tf.exp(self.old_neglog - self.neglog)
+                self.neglogs = - self.dist.log_prob(self.outputs)
+                self.new_neglogs = - self.dist.log_prob(self.actions)
+                ratio = tf.exp(self.old_neglogs - self.new_neglogs)
                 loss_unclipped = - self.advantages * ratio
                 loss_clipped = - self.advantages * tf.clip_by_value(ratio, 1.0 - self.clip_range, 1.0 + self.clip_range)
-                self.loss = tf.reduce_mean(tf.maximum(loss_unclipped, loss_clipped))
+                logits = self.dist.logits
+                probs = tf.nn.softmax(logits)
+                self.entropy = tf.reduce_mean(tf.keras.losses.categorical_crossentropy(probs, logits, from_logits=True))
+                self.loss = tf.reduce_mean(tf.maximum(loss_unclipped, loss_clipped)) - 0.01 * self.entropy
                 self.optimize = tf.compat.v1.train.AdamOptimizer(self.learning_rate).minimize(self.loss)
                 loss_summary = tf.compat.v1.summary.scalar("Actor/Loss", self.loss)
-                self.summary = tf.compat.v1.summary.merge([loss_summary])
+                ratio_summary = tf.compat.v1.summary.scalar("Actor/Ratio", tf.reduce_mean(ratio))
+                self.summary = tf.compat.v1.summary.merge([loss_summary, ratio_summary])
 
-    def create_actor_network(self, n_hidden=32, n_dense=8):
+    def create_actor_network(self, n_hidden, n_dense):
         inputs = tf.compat.v1.placeholder(tf.float32, shape=[None, self.s_dim[0], self.s_dim[1]])
         if self.policy == 'dense':
             inputs_reshaped = tf.keras.layers.Flatten()(inputs)
@@ -54,24 +60,18 @@ class Actor(object):
         outputs = tf.squeeze(dist.sample(1), axis=0)
         return inputs, outputs, dist
 
-    def train(self, inputs, outputs, advantages, neglogs):
+    def train(self, inputs, actions, advantages, neglogs):
         with self.graph.as_default():
             return self.sess.run([self.optimize, self.summary], feed_dict={
                 self.inputs: inputs,
-                self.outputs: outputs,
+                self.actions: actions,
                 self.advantages: advantages,
-                self.old_neglog: neglogs
+                self.old_neglogs: neglogs
             })
 
     def predict(self, inputs):
         with self.graph.as_default():
-            return self.sess.run(self.outputs, feed_dict={
-                self.inputs: inputs
-            })
-
-    def get_neglog(self, inputs):
-        with self.graph.as_default():
-            return self.sess.run(self.neglog, feed_dict={
+            return self.sess.run([self.outputs, self.neglogs], feed_dict={
                 self.inputs: inputs
             })
 
@@ -79,7 +79,7 @@ class Actor(object):
 
 class Critic(object):
 
-    def __init__(self, graph, sess, s_dim, a_dim, lr, clip_range, policy='dense'):
+    def __init__(self, graph, sess, s_dim, a_dim, lr, clip_range, policy='dense', n_hidden=32, n_dense=8):
         self.graph = graph
         self.sess = sess
         self.s_dim = s_dim
@@ -91,7 +91,7 @@ class Critic(object):
         with self.graph.as_default():
             with self.sess.as_default():
 
-                self.inputs, self.values = self.create_critic_network()
+                self.inputs, self.values = self.create_critic_network(n_hidden, n_dense)
                 self.targets = tf.compat.v1.placeholder(tf.float32, shape=[None, 1])
                 self.old_values = tf.placeholder(tf.float32, [None, 1])
 
@@ -105,7 +105,7 @@ class Critic(object):
                 loss_summary = tf.compat.v1.summary.scalar("Critic/Loss", self.loss)
                 self.summary = tf.compat.v1.summary.merge([target_summary, loss_summary])
 
-    def create_critic_network(self, n_hidden=32, n_dense=8):
+    def create_critic_network(self, n_hidden, n_dense):
         inputs = tf.compat.v1.placeholder(tf.float32, shape=[None, self.s_dim[0], self.s_dim[1]])
         if self.policy == 'dense':
             inputs_reshaped = tf.keras.layers.Flatten()(inputs)
