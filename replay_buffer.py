@@ -82,9 +82,13 @@ class ReplayBuffer(object):
         with open(fname, 'wb') as f:
             pickle.dump(self.buffer, f)
 
-    def load_buffer(self, fname):
+    def load_buffer(self, fname, n_samples=None):
         with open(fname, 'rb') as f:
             buffer = pickle.load(f)
+        if n_samples is not None:
+            buffer_list = [x for x in buffer]
+            buffer = buffer_list[:n_samples]
+            print('Loaded first {0} samples!'.format(n_samples))
         if len(buffer) > self.buffer_size:
             b_start = len(buffer) - self.buffer_size
             self.count = self.buffer_size

@@ -3,9 +3,8 @@
   <component name="ChangeListManager">
     <list default="true" id="98635c05-4f2f-4f58-8ea5-7a8fa8469745" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/a2c.py" beforeDir="false" afterPath="$PROJECT_DIR$/a2c.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dqn.py" beforeDir="false" afterPath="$PROJECT_DIR$/dqn.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/excavator_server.py" beforeDir="false" afterPath="$PROJECT_DIR$/excavator_server.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ppo.py" beforeDir="false" afterPath="$PROJECT_DIR$/ppo.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/replay_buffer.py" beforeDir="false" afterPath="$PROJECT_DIR$/replay_buffer.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/user_input/user_input.txt" beforeDir="false" afterPath="$PROJECT_DIR$/user_input/user_input.txt" afterDir="false" />
     </list>
@@ -46,7 +45,7 @@
       </list>
     </option>
   </component>
-  <component name="RunManager" selected="Python.detect_angle">
+  <component name="RunManager" selected="Python.excavator_server">
     <configuration name="detect_angle" type="PythonConfigurationType" factoryName="Python" temporary="true">
       <module name="SmartExcavator" />
       <option name="INTERPRETER_OPTIONS" value="" />
