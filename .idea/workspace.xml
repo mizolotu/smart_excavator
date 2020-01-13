@@ -2,10 +2,26 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="98635c05-4f2f-4f58-8ea5-7a8fa8469745" name="Default Changelist" comment="">
+      <change afterPath="$PROJECT_DIR$/autorun.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/env_backend.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/env_cfg.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/excavator_env.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/excavator_train.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/train_ai.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/zmq_tests.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/SmartExcavator.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/SmartExcavator.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/baselines/baselines/common/tf_util.py" beforeDir="false" afterPath="$PROJECT_DIR$/baselines/baselines/common/tf_util.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/baselines/baselines/ddpg/ddpg.py" beforeDir="false" afterPath="$PROJECT_DIR$/baselines/baselines/ddpg/ddpg.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/baselines/baselines/deepq/deepq.py" beforeDir="false" afterPath="$PROJECT_DIR$/baselines/baselines/deepq/deepq.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/baselines/baselines/ppo2/model.py" beforeDir="false" afterPath="$PROJECT_DIR$/baselines/baselines/ppo2/model.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/baselines/baselines/ppo2/ppo2.py" beforeDir="false" afterPath="$PROJECT_DIR$/baselines/baselines/ppo2/ppo2.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/baselines/baselines/ppo2/runner.py" beforeDir="false" afterPath="$PROJECT_DIR$/baselines/baselines/ppo2/runner.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/dqn.py" beforeDir="false" afterPath="$PROJECT_DIR$/dqn.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/excavator_client.py" beforeDir="false" afterPath="$PROJECT_DIR$/excavator_client.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/excavator_server.py" beforeDir="false" afterPath="$PROJECT_DIR$/excavator_server.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/replay_buffer.py" beforeDir="false" afterPath="$PROJECT_DIR$/replay_buffer.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/memories/mover.pkl" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/user_input/user_input.txt" beforeDir="false" afterPath="$PROJECT_DIR$/user_input/user_input.txt" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -22,7 +38,7 @@
     </option>
   </component>
   <component name="Git.Settings">
-    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/baselines" />
     <option name="ROOT_SYNC" value="DONT_SYNC" />
   </component>
   <component name="ProjectId" id="1RjKvYgB4V8ccGkwxuU4ud5vXbx" />
@@ -30,8 +46,8 @@
     <ConfirmationsSetting value="2" id="Add" />
   </component>
   <component name="PropertiesComponent">
-    <property name="last_opened_file_path" value="C:/Program Files/Git/bin/git.exe" />
-    <property name="settings.editor.selected.configurable" value="vcs.Git" />
+    <property name="last_opened_file_path" value="$USER_HOME$/Desktop/SmartExcavator_old" />
+    <property name="settings.editor.selected.configurable" value="com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable" />
   </component>
   <component name="RunDashboard">
     <option name="ruleStates">
@@ -45,26 +61,8 @@
       </list>
     </option>
   </component>
-  <component name="RunManager" selected="Python.excavator_server">
-    <configuration name="detect_angle" type="PythonConfigurationType" factoryName="Python" temporary="true">
-      <module name="SmartExcavator" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/detect_angle.py" />
-      <option name="PARAMETERS" value="" />
-      <option name="SHOW_COMMAND_LINE" value="true" />
-      <option name="EMULATE_TERMINAL" value="false" />
-      <option name="MODULE_MODE" value="false" />
-      <option name="REDIRECT_INPUT" value="false" />
-      <option name="INPUT_FILE" value="" />
-      <method v="2" />
-    </configuration>
-    <configuration name="dqn" type="PythonConfigurationType" factoryName="Python" temporary="true">
+  <component name="RunManager" selected="Python.train_ai">
+    <configuration name="env_backend" type="PythonConfigurationType" factoryName="Python" temporary="true">
       <module name="SmartExcavator" />
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
@@ -76,7 +74,7 @@
       <option name="IS_MODULE_SDK" value="true" />
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/dqn.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/env_backend.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
@@ -106,7 +104,7 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
-    <configuration name="excavator_train_supervised" type="PythonConfigurationType" factoryName="Python" temporary="true">
+    <configuration name="excavator_train" type="PythonConfigurationType" factoryName="Python" temporary="true">
       <module name="SmartExcavator" />
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
@@ -118,7 +116,7 @@
       <option name="IS_MODULE_SDK" value="true" />
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/excavator_train_supervised.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/excavator_train.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
@@ -127,7 +125,7 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
-    <configuration name="generate_levels" type="PythonConfigurationType" factoryName="Python" temporary="true">
+    <configuration name="train_ai" type="PythonConfigurationType" factoryName="Python" temporary="true">
       <module name="SmartExcavator" />
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
@@ -139,7 +137,28 @@
       <option name="IS_MODULE_SDK" value="true" />
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/generate_levels.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/train_ai.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="zmq_tests" type="PythonConfigurationType" factoryName="Python" temporary="true">
+      <module name="SmartExcavator" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/zmq_tests.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
@@ -149,19 +168,19 @@
       <method v="2" />
     </configuration>
     <list>
-      <item itemvalue="Python.detect_angle" />
-      <item itemvalue="Python.dqn" />
       <item itemvalue="Python.excavator_server" />
-      <item itemvalue="Python.excavator_train_supervised" />
-      <item itemvalue="Python.generate_levels" />
+      <item itemvalue="Python.excavator_train" />
+      <item itemvalue="Python.train_ai" />
+      <item itemvalue="Python.env_backend" />
+      <item itemvalue="Python.zmq_tests" />
     </list>
     <recent_temporary>
       <list>
+        <item itemvalue="Python.train_ai" />
+        <item itemvalue="Python.zmq_tests" />
+        <item itemvalue="Python.env_backend" />
+        <item itemvalue="Python.excavator_train" />
         <item itemvalue="Python.excavator_server" />
-        <item itemvalue="Python.detect_angle" />
-        <item itemvalue="Python.generate_levels" />
-        <item itemvalue="Python.excavator_train_supervised" />
-        <item itemvalue="Python.dqn" />
       </list>
     </recent_temporary>
   </component>
