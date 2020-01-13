@@ -2,13 +2,12 @@ import tensorflow as tf
 
 class DDQN(object):
 
-    def __init__(self, graph, sess, s_dim, a_dim, lr, tau=1.0, policy='lstm', n_hidden=64, n_dense=64):
+    def __init__(self, graph, sess, s_dim, a_dim, lr, policy='lstm', n_hidden=64, n_dense=64):
         self.graph = graph
         self.sess = sess
         self.s_dim = s_dim
         self.a_dim = a_dim
         self.learning_rate = lr
-        self.tau = tau
         self.policy = policy
 
         with self.graph.as_default():
@@ -20,22 +19,21 @@ class DDQN(object):
                 self.q = tf.reduce_sum(tf.multiply(self.outputs, self.actions), axis=1)
                 self.network_params = tf.compat.v1.trainable_variables()[num_of_vars:]
 
-                self.target_inputs, self.target_outputs  = self.create_q_network(n_hidden, n_dense)
+                self.target_inputs, self.target_outputs = self.create_q_network(n_hidden, n_dense)
                 self.target_actions = tf.compat.v1.placeholder(tf.float32, [None, self.a_dim])
                 self.target_q = tf.reduce_sum(tf.multiply(self.target_outputs, self.target_actions), axis=1)
                 self.target_network_params = tf.compat.v1.trainable_variables()[(len(self.network_params) + num_of_vars):]
 
                 self.update_target_network_params = [
-                    self.target_network_params[i].assign(
-                        tf.multiply(self.network_params[i], self.tau) + tf.multiply(self.target_network_params[i], 1. - self.tau)
-                    ) for i in range(len(self.target_network_params))
+                    self.target_network_params[i].assign(self.network_params[i])
+                    for i in range(len(self.target_network_params))
                 ]
 
                 self.predicted_q_value = tf.compat.v1.placeholder(tf.float32, [None, 1])
                 self.weights = tf.compat.v1.placeholder(tf.float32, [None, 1])
                 self.abs_errors = tf.abs(self.predicted_q_value - self.q)
                 self.loss = tf.reduce_mean(self.weights * tf.square(self.predicted_q_value - self.q))
-                self.optimize = tf.compat.v1.train.RMSPropOptimizer(self.learning_rate).minimize(self.loss)
+                self.optimize = tf.compat.v1.train.AdamOptimizer(self.learning_rate).minimize(self.loss)
 
                 q_summary = tf.compat.v1.summary.scalar("DQN/Q-value", tf.reduce_mean(self.predicted_q_value))
                 loss_summary = tf.compat.v1.summary.scalar("DQN/Loss", self.loss)
@@ -49,13 +47,8 @@ class DDQN(object):
             inputs_reshaped = tf.keras.layers.Flatten()(inputs)
             hidden = tf.keras.layers.Dense(units=n_hidden, activation=tf.nn.relu)(inputs_reshaped)
         elif self.policy == 'conv':
-            inputs_reshaped = tf.reshape(inputs, shape=[tf.shape(inputs)[0], 1, self.s_dim[0], self.s_dim[1]])
-            conv1 = tf.keras.layers.Conv2D(
-                filters=n_hidden, kernel_size=[1, self.s_dim[1]],
-                strides=[1, self.s_dim[1]],
-                activation='relu',
-            )(inputs_reshaped)
-            hidden = tf.keras.layers.Flatten()(conv1)
+            conv = tf.keras.layers.Conv1D(filters=n_hidden, kernel_size=4, strides=1, activation='relu')(inputs)
+            hidden = tf.keras.layers.Flatten()(conv)
         elif self.policy == 'lstm':
             lstm_cell = tf.keras.layers.LSTMCell(units=n_hidden)
             rnn_output = tf.keras.layers.RNN(lstm_cell)(inputs)

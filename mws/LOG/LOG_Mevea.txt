@@ -1,0 +1,1 @@
+13:07:47: DMParseSimulationSize: "C:\Users\iotli\PycharmProjects\SmartExcavator\mws\env.mws" not found in C:\Users\iotli\PycharmProjects\SmartExcavator\mws, cannot load

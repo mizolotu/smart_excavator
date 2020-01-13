@@ -1,5 +1,5 @@
+import sys, requests
 import numpy as np
-import requests
 from time import time
 from collections import deque
 
@@ -34,8 +34,8 @@ component_controls = [p.split(' ')[0] for p in data_names['controls']]
 
 # thresholds
 
-move_thr = np.array([2.5, 2.5, 2.5, 2.5])
-time_thr = 0.05
+move_thr = np.array([2.5, 2.5 * 10e6, 2.5 * 10e6, 2.5 * 10e6])
+time_thr = 0.025
 control_gain = 600
 
 # Dimensions
@@ -47,13 +47,14 @@ action_dim = 4
 
 # Other parameters
 
-n_attempts_to_reach_target = 64
+n_attempts_to_reach_target = 5000
 n_iterations_stay = 1
 pid_gain_limits = np.vstack([
     100 * np.ones(action_dim),
     1 * np.ones(action_dim),
     5 * np.ones(action_dim)
 ])
+
 # RL agent
 
 agent = '127.0.0.1:5000'
@@ -131,7 +132,6 @@ def get_pid_gains(deltas, deltas_to_next, delta_start, delta_end, in_target, tim
         print(e)
         gains = np.vstack([[0 for _ in range(action_dim)] for _ in range(pid_dim)])
         success = False
-    print(gains)
     return gains, success
 
 def generate_reset_trajectory(trajectory, trajectory_idx):
@@ -140,6 +140,7 @@ def generate_reset_trajectory(trajectory, trajectory_idx):
         reset_trajectory.append(trajectory[i, :])
     reset_trajectory.append(trajectory[-1, :])
     return np.array(reset_trajectory)
+
 
 ##### I N I T  S C R I P T #####
 
@@ -251,12 +252,11 @@ def callScript(deltaTime, simulationTime):
                 GObject.data['trajectory_idx'] = 0
                 GObject.data['is_trajectory_set'] = True
                 GObject.data['ticks_since_last_time'] = 0.0
-                GObject.data['n_attempts'] = 0
+                # GObject.data['n_attempts'] = 0
 
                 # PID control gains for the 1-st target in the trajectory
 
-                points = GObject.data['points']
-                idx = GObject.data['trajectory_idx']
+                idx = 0
                 target = trajectory[idx, :]
                 if idx < len(trajectory) - 1:
                     next_target = trajectory[idx + 1, :]
@@ -285,6 +285,29 @@ def callScript(deltaTime, simulationTime):
                 GObject.data['are_pid_gains_set'] = success
                 GObject.data['integ_prev'] = np.zeros(action_dim)
                 GObject.data['done'] = False
+
+        else:
+
+            points = GObject.data['points']
+            trajectory = GObject.data['trajectory']
+            idx = GObject.data['trajectory_idx']
+            target = trajectory[idx, :]
+            if idx < len(trajectory) - 1:
+                next_target = trajectory[idx + 1, :]
+            else:
+                next_target = trajectory[idx, :]
+            deltas, deltas_to_next = points_to_deltas(points, target, next_target)
+            target_reached = np.zeros(action_dim)
+            for i in range(action_dim):
+                if np.abs(deltas[-1][i]) < move_thr[i]:
+                    target_reached[i] = 1
+                else:
+                    target_reached[i] = 0
+            for i in range(action_dim):
+                if target_reached[i] == 1:
+                    GObject.data['in_target'][i] += 1
+                elif target_reached[i] == 0:
+                    GObject.data['in_target'][i] = 0
 
         # move
 
@@ -334,7 +357,7 @@ def callScript(deltaTime, simulationTime):
                     GObject.data['done'] = True
                     GObject.data['is_trajectory_set'] = False
                     GObject.data['delta_end'] = list(deltas[-1])
-                    GObject.data['n_attempts'] = 0
+                    # GObject.data['n_attempts'] = 0
 
                     # check status
 
@@ -404,7 +427,7 @@ def callScript(deltaTime, simulationTime):
 
             # if time limit has been reached, we request new PID gains without switching the target
 
-            elif time() - GObject.data['target_set_time'] > time_limit: # + GObject.data['target_bonus_time']:
+            elif time() - GObject.data['target_set_time'] > time_limit:
 
                 # increment attempt count
 
@@ -421,7 +444,7 @@ def callScript(deltaTime, simulationTime):
                 time_spent = time() - GObject.data['target_set_time']
                 if GObject.data['n_attempts'] >= n_attempts_to_reach_target:
                     done = True
-                    GObject.data['n_attempts'] = 0
+                    # GObject.data['n_attempts'] = 0
                 else:
                     done = False
                 if np.all(np.abs(last_delta) <= move_thr):
@@ -438,6 +461,10 @@ def callScript(deltaTime, simulationTime):
                     time_limit,
                     done
                 )
+
+                # exit
+                if GObject.data['n_attempts'] >= n_attempts_to_reach_target:
+                    sys.exit(0)
 
                 # we update delta_start???
 
