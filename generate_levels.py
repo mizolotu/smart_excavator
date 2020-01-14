@@ -31,7 +31,8 @@ def get_data_from_file(file_name, data_names):
 def extract_points(data):
     timestamps = np.vstack(data['timestamp'])
     measurements = np.vstack(data['measurements'])
-    points = {'x': measurements, 't': timestamps}
+    controls = np.vstack(data['controls'])
+    points = {'x': measurements, 't': timestamps, 'a': controls}
     return points
 
 def extract_excavator_cycles(points, cycle_min_duration=10):
@@ -40,6 +41,7 @@ def extract_excavator_cycles(points, cycle_min_duration=10):
     for i in range(len(slew_twists) - 1):
         if points['t'][slew_twists[i + 1]] - points['t'][slew_twists[i]] > cycle_min_duration:
             cycle = {
+                'a': points['a'][slew_twists[i] - 1: slew_twists[i + 1] + 1, :],
                 'x': points['x'][slew_twists[i] - 1: slew_twists[i + 1] + 1, :],
                 't': points['t'][slew_twists[i] - 1: slew_twists[i + 1] + 1],  # - points['t'][slew_twists[i]],
             }
@@ -131,8 +133,7 @@ if __name__ == '__main__':
     ]
     data_names = {
         'timestamp': ['Time'],
-        'control': ['Input_Slew RealValue', 'Input_BoomLift RealValue', 'Input_DipperArm RealValue',
-                    'Input_Bucket RealValue'],
+        'controls': ['Input_Slew RealValue', 'Input_BoomLift RealValue', 'Input_DipperArm RealValue', 'Input_Bucket RealValue'],
         'measurements': ['ForceR_Slew r', 'Cylinder_BoomLift_L x', 'Cylinder_DipperArm x', 'Cylinder_Bucket x']
     }
     n_files = len(data_files)
@@ -189,7 +190,7 @@ if __name__ == '__main__':
             #points_resampled, time_step = resample_cycle_points(cycle, n_steps=128)
             #X.append(points_resampled)
             #levels.append((points_resampled, time_step, tasks[0], tasks[1]))
-            levels.append((cycle['x'], cycle['t'], tasks))
+            levels.append((cycle['x'], cycle['t'], tasks, cycle['a']))
 
     # dig and emp start points
 
