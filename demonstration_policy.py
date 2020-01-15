@@ -149,26 +149,26 @@ def generate_demonstration_dataset(fname, mws = 'C:\\Users\\iotli\\PycharmProjec
             for i in range(cycle.shape[0]):
                 target = cycle[i, :]
                 post_target(target)
-                in_target = False
+                in_target = np.zeros(4)
                 mass = backend['m']
                 if mass > 0.05 and dig_angle is None:
                     dig_angle = backend['x'][0]
                 if dig_angle is not None and np.abs(backend['x'][0] - dig_angle) <= a_thr and backend['x'][3] > bucket_max:
                     bucket_max = backend['x'][3]
                     dig_target_idx = i
-                while not in_target:
+                while not np.all(in_target):
                     current = backend['x']
                     dist_to_x = np.abs(np.array(current) - target)
-                    if np.all(dist_to_x <= x_thr):
-                        in_target = True
-                    else:
-                        pass
+                    for i in range(4):
+                        if dist_to_x[i] < x_thr:
+                            in_target[i] = 1
             dig_target = cycle[dig_target_idx, :]
             t = (dig_target - x_min) / (x_max - x_min + 1e-10)
             for i in range(cycle.shape[0] - 2):
                 a = (cycle[i + 2,:] - x_min) / (x_max - x_min + 1e-10)
                 c = (cycle[i + 1,:] - x_min) / (x_max - x_min + 1e-10)
                 l = (cycle[i,:] - x_min) / (x_max - x_min + 1e-10)
+                print(t - l, t - c, a)
                 x = np.hstack([t - l, t - c, a]).tolist()
                 line =','.join([str(item) for item in x])
                 with open(fname, 'a') as f:
@@ -194,7 +194,7 @@ if __name__ == '__main__':
     # file name to save dataset
 
     fname = 'data/policy_data.txt'
-    open(fname, 'w').close()
+    #open(fname, 'w').close()
 
     # original data
 
