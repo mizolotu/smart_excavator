@@ -43,10 +43,9 @@ component_controls = [p.split(' ')[0] for p in data_names['controls']]
 
 # gains and thresholds
 
-p_gain = 100 # P controller gain
 p_controller_frequency = 1000 # Hz
-p_action_thr = np.array([1, 3, 5, 5])
 eps = 1e-10 # to prevent dividing by zero
+p_action_thr = np.array([1, 3, 3, 3])
 
 # dimensions
 
@@ -76,13 +75,32 @@ def register():
         eid = None
     return eid
 
-def p_controls(current, action):
+def pid_controls(current, previous, action, delta_time, integ_prev, p_thr=5, gains=[[100, 100, 100, 100], [0.5, 0.01, 0.01, 0.05], [5, 0.5, 0.5, 0.5]]):
+    previous = np.array(previous)
     current = np.array(current)
     target = np.array(action[:action_dim])
-    p_gain = np.array(action[action_dim:])
+    if len(action) > action_dim:
+        gains = np.array(action[action_dim:])
+    else:
+        gains = np.array(gains)
     p = target - current
-    controls = np.nan_to_num(-p * p_gain)
-    controls[np.abs(controls) < p_action_thr] = 0
+    error_prev = target - previous
+    d = (p - error_prev) / delta_time
+    i = integ_prev + (p + error_prev) / 2 * delta_time
+    gains = np.array(gains)
+    controls = - (gains[0, :] * p + gains[1, :] * i + gains[2, :] * d)
+    controls[np.abs(p) < p_thr] = 0
+    return controls, i
+
+def p_controls(current, action, gains=[100, 100, 100, 100]):
+    current = np.array(current)
+    target = np.array(action[:action_dim])
+    if len(action) > action_dim:
+        gains = np.array(action[action_dim:])
+    else:
+        gains = np.array(gains)
+    p = target - current
+    controls = np.nan_to_num(-p * gains)
     return controls
 
 def get_mode(id):
@@ -155,6 +173,7 @@ def initScript():
     GObject.data['last_time'] = time()
     GObject.data['previous_position'] = [x.value() for x in GObject.data['component_objects']]
     GObject.data['current_position'] = [x.value() for x in GObject.data['component_objects']]
+    GObject.data['integ_prev'] = 0
     GObject.data['time_passed'] = 0
     GObject.data['target_position'] = None
 
@@ -199,7 +218,7 @@ def callScript(deltaTime, simulationTime):
 
     # if the simulator is under AI control
 
-    elif GObject.data['mode'].startswith('AI'):
+    else: # if GObject.data['mode'].startswith('AI'):
 
         # if the target is not set, ask for it immediately
 
@@ -212,6 +231,7 @@ def callScript(deltaTime, simulationTime):
             # in case of success
 
             if target is not None:
+                GObject.data['integ_prev'] = 0
                 GObject.data['target_position'] = target
                 GObject.data['is_target_set'] = True
                 GObject.data['target_set_time'] = time()
@@ -262,6 +282,7 @@ def callScript(deltaTime, simulationTime):
                 # processs target
 
                 if target is not None:
+                    GObject.data['integ_prev'] = 0
                     GObject.data['target_position'] = target
                     GObject.data['is_target_set'] = True
                     GObject.data['target_set_time'] = time()
@@ -269,6 +290,13 @@ def callScript(deltaTime, simulationTime):
                 # finally apply P control if it is enabled
 
                 if change_control:
-                    component_values = p_controls(GObject.data['current_position'], GObject.data['target_position'])
+                    component_values, GObject.data['integ_prev'] = pid_controls(
+                        GObject.data['current_position'],
+                        GObject.data['previous_position'],
+                        GObject.data['target_position'],
+                        t_delta,
+                        GObject.data['integ_prev']
+                    )
+                    print(component_values)
                     for i in range(action_dim):
                         GDict[component_controls[i]].setInputValue(component_values[i])

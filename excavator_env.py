@@ -89,7 +89,7 @@ class ExcavatorEnv(gym.Env):
         self._start_backend()
         self._request_target_list()
         self.target_idx = 0
-        self._get_mode(current_mode)
+        self._get_mode(new_mode=current_mode)
 
         # wait for the backend to start
 
