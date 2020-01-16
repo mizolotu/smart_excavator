@@ -43,9 +43,9 @@ component_controls = [p.split(' ')[0] for p in data_names['controls']]
 
 # gains and thresholds
 
-p_controller_frequency = 1000 # Hz
-eps = 1e-10 # to prevent dividing by zero
-target_thr = 2.5
+p_controller_frequency = 1000  # Hz
+eps = 1e-10  # to prevent dividing by zero
+target_thr = 2.5  # target component is considered being reached if the distance between the target and the current component value is below this threshold
 
 # dimensions
 

@@ -1,6 +1,8 @@
 import winreg, subprocess, gym, requests
 import numpy as np
+import tensorflow as tf
 from time import sleep, time
+from learn_demonstration_policy import create_model
 
 class ExcavatorEnv(gym.Env):
 
@@ -8,56 +10,83 @@ class ExcavatorEnv(gym.Env):
 
     def __init__(self, id,
         mws='C:\\Users\\iotli\\PycharmProjects\\SmartExcavator\\mws\\env.mws',
-        state_dim=10,
+        obs_dim=9+4,
         action_dim=4,
         http_url='http://127.0.0.1:5000',
         discrete_action=None,
     ):
+
         super(ExcavatorEnv, self).__init__()
+        self.obs_dim = obs_dim
+        self.action_dim = action_dim
+
+        # solver args
+
         regkey = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r'Software\WOW6432Node\Mevea\Mevea Simulation Software')
         (solverpath, _) = winreg.QueryValueEx(regkey, 'InstallPath')
         solverpath += r'\Bin\MeveaSolver.exe'
         winreg.CloseKey(regkey)
         self.solver_args = [solverpath, r'/loadmws', mws, r'/saveplots', r'/silent']
-        self.solver_proc = None
+
+        # id and counts
+
         self.episode_count = 0
         self.step_count = 0
-        self.step_count_max = 100
+        self.step_count_max = 128
         self.env_id = id
         self.backend_assigned = False
         self.target_list = []
         self.target_idx = 0
         self.http_url = http_url
+
+        # state, action and reward coefficients
+
+        self.stick_to_demonstration_policy = 0.95
         self.dist_coeff = 0.5
-        self.orientation_coeff = 0.2
-        self.mass_coeff = 0.8
+        self.mass_coeff = 0.5
         self.collision_coeff = 10.0
         self.dist_thr = 0.01
-        self.orientation_thr = 0.05
         self.mass_thr = 0.05
         self.collision_thr = 0
         self.x_min = np.array([-180.0, 3.9024162648733514, 13.252630737652677, 16.775050853637147])
         self.x_max = np.array([180.0, 812.0058600513476, 1011.7128949856826, 787.6024456729566])
-        self.t_max = np.array([16.38471214911517, 7.04791988497195, 4.854493033885956, 3.783558408419291])
         self.m_max = 1000
-        self.last_x = np.zeros(action_dim)
-        self.last_step_time = time()
-        self.observation_space = gym.spaces.Box(low=0, high=1, shape=(state_dim,), dtype=np.float)
+        self.last_state = np.zeros(obs_dim - action_dim)
+        self.last_demo_action = np.zeros(action_dim)
+
+        # demonstration policy
+
+        self.model = self._load_demo_policy()
+
+        # observation and action spaces
+
+        self.observation_space = gym.spaces.Box(low=0, high=1, shape=(obs_dim,), dtype=np.float)
         self.discrete_action = discrete_action
         if self.discrete_action is None:
             self.action_space = gym.spaces.Box(low=-1, high=1, shape=(action_dim,), dtype=np.float)
         else:
             self.action_space = gym.spaces.Discrete(self.discrete_action * action_dim)
 
-    def step(self, action, x_ind=4, m_ind=-2):
-        target = self._action_target(action)
-        jdata_before_action = self._post_target(target)
-        delay = self._calculate_delay(jdata_before_action['x'], target[:x_ind])
-        sleep(np.maximum(0, delay - time() + self.last_step_time))
-        jdata = self._post_target()
+    def step(self, action, x_ind=4, m_ind=-1, x_thr=5.0, max_delay=3.0):
+        real_action = self.stick_to_demonstration_policy * self.last_demo_action + (1 - self.stick_to_demonstration_policy) * action
+        target = np.clip(self.x_min + (self.x_max - self.x_min) * real_action, self.x_min, self.x_max)
+        print(target)
+        jdata = self._post_target(target)
+        in_target = np.zeros_like(target)
+        while True:
+            if jdata is not None:
+                current = jdata['x']
+                dist_to_x = np.abs(np.array(current) - target)
+                for i in range(self.action_dim):
+                    if dist_to_x[i] < x_thr:
+                        in_target[i] = 1
+            if (time() - self.last_step_time) > max_delay:
+                break
+            jdata = self._post_target()
         state = self._construct_state(jdata)
-        x = state[:x_ind] # first 4 features
-        m = state[m_ind] # second last feature
+        demo_action = self._predict_demo_action(state)
+        x = state[:x_ind]
+        m = state[m_ind]
         c = jdata['c']
         self.step_count += 1
         reward, switch_target, restart_required = self._calculate_reward(x, m, c)
@@ -75,9 +104,10 @@ class ExcavatorEnv(gym.Env):
             done = False
         else:
             done = False
-        self.last_x = state[:x_ind]
+        self.last_state = state.copy()
+        self.last_demo_action = demo_action.copy()
         self.last_step_time = time()
-        return state, reward, done, {'r': reward, 'l': self.step_count}
+        return np.hstack([state, demo_action]), reward, done, {'r': reward, 'l': self.step_count}
 
     def reset(self, delay=1.0, x_ind=4):
 
@@ -102,13 +132,20 @@ class ExcavatorEnv(gym.Env):
                 else:
                     sleep(delay)
         state = self._construct_state(jdata)
+        demo_action = self._predict_demo_action(state)
         self.last_step_time = time()
         self.step_count = 0
-        self.last_x = state[:x_ind]
-        return state
+        self.last_state = state.copy()
+        self.last_demo_action = demo_action.copy()
+        return np.hstack([state, demo_action])
 
     def render(self, mode='human', close=False):
         pass
+
+    def _load_demo_policy(self, checkpoint_path='policies/demonstration/last.ckpt'):
+        model = create_model(self.obs_dim - self.action_dim, self.action_dim)
+        model.load_weights(checkpoint_path)
+        return model
 
     def _get_mode(self, new_mode=None, uri='mode'):
         url = '{0}/{1}'.format(self.http_url, uri)
@@ -222,21 +259,22 @@ class ExcavatorEnv(gym.Env):
         l_std = (l - self.x_min) / (self.x_max - self.x_min + eps)
         m_std = m / (self.m_max + eps)
         target = self.target_list[self.target_idx]
-        target_bit = self.target_idx % 2
-        state = np.hstack([x_std, target, m_std, target_bit]) # current position + target position + ground mass in bucket + target type
+        state = np.hstack([target - l_std, target - x_std, m_std])
         return state
+
+    def _predict_demo_action(self, state):
+        action = self.model.predict(state.reshape(1, -1))[0]
+        return action
 
     def _calculate_reward(self, x, m, c):
         target_bit = self.target_idx % 2
         switch_target = False
         restart_required = False
-        dist_to_target = np.linalg.norm(x[:-1] - self.target_list[self.target_idx][:-1])
+        dist_to_target = np.linalg.norm(x - self.target_list[self.target_idx])
         r = 1 - self.dist_coeff * dist_to_target
         if target_bit == 0:
             if dist_to_target <= self.dist_thr:
-                dist_to_orientation = np.abs(self.observation_space.high[0] - x[-1])
-                r += 1 - dist_to_orientation * self.orientation_coeff + m * self.mass_coeff
-                if dist_to_orientation < self.orientation_thr and m > self.mass_thr:
+                if m > self.mass_thr:
                     switch_target = True
             else:
                 r -= c * self.collision_coeff
@@ -244,9 +282,7 @@ class ExcavatorEnv(gym.Env):
                     restart_required = True
         else:
             if dist_to_target <= self.dist_thr:
-                dist_to_orientation = np.abs(self.observation_space.low[0] - x[-1])
-                r += (1 - dist_to_orientation) * self.orientation_coeff
-                if dist_to_orientation < self.orientation_thr and m < self.mass_thr:
+                if m < self.mass_thr:
                     switch_target = True
             else:
                 r -= c * self.collision_coeff

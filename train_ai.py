@@ -1,7 +1,6 @@
 import json, logging
 from excavator_env import ExcavatorEnv
 from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
-#from baselines.deepq import learn
 from baselines.ppo2.ppo2 import learn
 from threading import Thread
 from flask import Flask, jsonify, request
@@ -81,24 +80,25 @@ def target():
         data['backend_running'] = envs[id]['backend_running']
         return jsonify(data)
 
+
 if __name__ == '__main__':
 
     # target lists
 
-    targets = [[90, 408, 406, 418], [-76, 608, 413, 232]]
+    targets = [[72.77621012856298, 448.1429081568389, 706.6441233973571, 257.47653181221153], [-76, 608, 413, 232]]
 
     # environment raw data
 
     envs = [
         {'backend_assigned': False, 'backend_running': False, 'mode': 'AI_TRAIN', 'target_list': targets, 'x': None, 'l': None, 't': None, 'y': None, 'm': None, 'c': None},
-        {'backend_assigned': False, 'backend_running': False, 'mode': 'AI_TRAIN', 'target_list': targets, 'x': None, 'l': None, 't': None, 'y': None, 'm': None, 'c': None}
+        #{'backend_assigned': False, 'backend_running': False, 'mode': 'AI_TRAIN', 'target_list': targets, 'x': None, 'l': None, 't': None, 'y': None, 'm': None, 'c': None}
     ]
 
     # create environments
 
     env_fns = [create_env(key) for key in range(len(envs))]
     env = SubprocVecEnv(env_fns)
-    reset_th = Thread(target=learn, args=(env, 'lstm'))
+    reset_th = Thread(target=learn, args=(env, 'mlp'))
     reset_th.start()
 
     # start http server

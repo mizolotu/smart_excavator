@@ -17,10 +17,27 @@ def constfn(val):
         return val
     return f
 
-def learn(*, network, env, total_timesteps, eval_env = None, seed=None, nsteps=2048, ent_coef=0.0, lr=3e-4,
-            vf_coef=0.5,  max_grad_norm=0.5, gamma=0.99, lam=0.95,
-            log_interval=10, nminibatches=4, noptepochs=4, cliprange=0.2,
-            save_interval=0, load_path=None, model_fn=None, **network_kwargs):
+def learn(env, network,
+    total_timesteps=128*10e4,
+    eval_env = None,
+    seed=None,
+    nsteps=128,
+    ent_coef=0.0,
+    lr=3e-4,
+    vf_coef=0.5,
+    max_grad_norm=0.5,
+    gamma=0.99,
+    lam=0.95,
+    log_interval=10,
+    nminibatches=4,
+    noptepochs=4,
+    cliprange=0.2,
+    save_interval=0,
+    load_path=None,
+    model_fn=None,
+    **network_kwargs
+):
+
     '''
     Learn policy using PPO algorithm (https://arxiv.org/abs/1707.06347)
 
@@ -97,17 +114,24 @@ def learn(*, network, env, total_timesteps, eval_env = None, seed=None, nsteps=2
         network = policy_network_fn(ob_space.shape)
 
     # Calculate the batch_size
+
     nbatch = nenvs * nsteps
     nbatch_train = nbatch // nminibatches
     is_mpi_root = (MPI is None or MPI.COMM_WORLD.Get_rank() == 0)
 
     # Instantiate the model object (that creates act_model and train_model)
+
     if model_fn is None:
         from baselines.ppo2.model import Model
         model_fn = Model
 
-    model = model_fn(ac_space=ac_space, policy_network=network, ent_coef=ent_coef, vf_coef=vf_coef,
-                     max_grad_norm=max_grad_norm)
+    model = model_fn(
+        ac_space=ac_space,
+        policy_network=network,
+        ent_coef=ent_coef,
+        vf_coef=vf_coef,
+        max_grad_norm=max_grad_norm
+    )
 
     if load_path is not None:
         load_path = osp.expanduser(load_path)
@@ -116,6 +140,7 @@ def learn(*, network, env, total_timesteps, eval_env = None, seed=None, nsteps=2
         ckpt.restore(manager.latest_checkpoint)
 
     # Instantiate the runner object
+
     runner = Runner(env=env, model=model, nsteps=nsteps, gamma=gamma, lam=lam)
     if eval_env is not None:
         eval_runner = Runner(env = eval_env, model = model, nsteps = nsteps, gamma = gamma, lam= lam)
@@ -125,6 +150,7 @@ def learn(*, network, env, total_timesteps, eval_env = None, seed=None, nsteps=2
         eval_epinfobuf = deque(maxlen=100)
 
     # Start total timer
+
     tfirststart = time.perf_counter()
 
     nupdates = total_timesteps//nbatch
