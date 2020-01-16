@@ -18,10 +18,10 @@ def constfn(val):
     return f
 
 def learn(env, network,
-    total_timesteps=128*10e4,
+    total_timesteps=56*10e4,
     eval_env = None,
     seed=None,
-    nsteps=128,
+    nsteps=56,
     ent_coef=0.0,
     lr=3e-4,
     vf_coef=0.5,
