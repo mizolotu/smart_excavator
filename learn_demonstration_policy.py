@@ -1,5 +1,6 @@
 import tensorflow as tf
 import numpy as np
+import sys, os
 
 def create_mlp_model(n_features, n_labels, n_layers = 3, n_nodes = 256):
     model = tf.keras.models.Sequential([tf.keras.Input(shape=(n_features,))])
@@ -22,6 +23,11 @@ def create_model(n_features, n_labels, n_layers = 2, n_nodes = 256):
     return model
 
 if __name__ == '__main__':
+
+    # disable cuda if needed
+
+    if'cpu' in sys.argv[1:]:
+        os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
     #  get data
 
