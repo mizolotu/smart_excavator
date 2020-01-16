@@ -97,7 +97,7 @@ class ExcavatorEnv(gym.Env):
         self.step_count += 1
         reward, switch_target, restart_required = self._calculate_reward(x, m, c, t_delta)
         print(self.obs_idx, target, reward, switch_target)
-        if self.step_count >= self.step_count_max:
+        if self.step_count >= self.step_count_max - 1:
             print('Solver {0} will restart as it has reached maximum step count.'.format(self.env_id))
             done = True
         elif restart_required:
@@ -284,7 +284,7 @@ class ExcavatorEnv(gym.Env):
         restart_required = False
         dist_to_target = np.linalg.norm(x - self.target_list[self.target_idx])
         time_elapsed = t / self.t_max
-        r = self.dist_coeff * (1 - dist_to_target) + self.time_coeff * (1 - time_elapsed)  + self.mass_coeff * m - self.collision_coeff * c
+        r = self.dist_coeff * (1 - dist_to_target) + self.time_coeff * (1 - time_elapsed)  - self.collision_coeff * c
         if self.obs_idx == self.n_steps:
             switch_target = True
             self.obs_stack = np.zeros((self.n_steps, self.obs_dim - self.action_dim))
@@ -294,6 +294,7 @@ class ExcavatorEnv(gym.Env):
                 if m > self.mass_thr:
                     switch_target = True
         else:
+            r += self.mass_coeff * m
             if dist_to_target <= self.dist_thr:
                 if m < self.mass_thr:
                     switch_target = True

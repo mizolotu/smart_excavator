@@ -1,4 +1,4 @@
-import time
+import time, os
 import numpy as np
 import tensorflow as tf
 import os.path as osp
@@ -17,7 +17,7 @@ def constfn(val):
         return val
     return f
 
-def learn(env, network,
+def learn(env, network_,
     total_timesteps=56*10e4,
     eval_env = None,
     seed=None,
@@ -32,8 +32,9 @@ def learn(env, network,
     nminibatches=4,
     noptepochs=4,
     cliprange=0.2,
-    save_interval=0,
-    load_path=None,
+    save_interval=1,
+    save_path_='policies/ppo/{0}',
+    load_path_='policies/ppo/{0}',
     model_fn=None,
     **network_kwargs
 ):
@@ -108,8 +109,8 @@ def learn(env, network,
     ob_space = env.observation_space
     ac_space = env.action_space
 
-    if isinstance(network, str):
-        network_type = network
+    if isinstance(network_, str):
+        network_type = network_
         policy_network_fn = get_network_builder(network_type)(**network_kwargs)
         network = policy_network_fn(ob_space.shape)
 
@@ -133,8 +134,12 @@ def learn(env, network,
         max_grad_norm=max_grad_norm
     )
 
-    if load_path is not None:
-        load_path = osp.expanduser(load_path)
+    if save_path_ is not None:
+        format_strs = os.getenv('', 'stdout,log,csv').split(',')
+        logger.configure(osp.abspath(save_path_.format(network_)), format_strs)
+
+    if load_path_ is not None:
+        load_path = osp.expanduser(load_path_.format(network_))
         ckpt = tf.train.Checkpoint(model=model)
         manager = tf.train.CheckpointManager(ckpt, load_path, max_to_keep=None)
         ckpt.restore(manager.latest_checkpoint)
@@ -217,6 +222,13 @@ def learn(env, network,
                 logger.logkv('loss/' + lossname, lossval)
 
             logger.dumpkvs()
+
+        if update % save_interval == 0:
+            checkdir = osp.join(logger.get_dir(), 'checkpoints')
+            os.makedirs(checkdir, exist_ok=True)
+            savepath_last = osp.join(checkdir, 'last.ckpt')
+            print('Saving to {0}'.format(savepath_last))
+            model.save_weights(savepath_last)
 
     return model
 # Avoid division error when calculate the mean (in our case if epinfo is empty returns np.nan, not return an error)
