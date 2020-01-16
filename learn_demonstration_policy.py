@@ -37,11 +37,11 @@ if __name__ == '__main__':
     series_len = 14
     n_samples = data.shape[0]
     assert n_samples % series_len == 0
-    n_features = data.shape[1] - 2 * action_dim
+    data = data[:, action_dim:]
+    n_features = data.shape[1] - action_dim
     #x_train = data[:, :n_features]
     x_train = np.zeros((n_samples, series_len, n_features))
     m_train = np.zeros((n_samples, series_len), dtype=bool)
-    data = np.hstack([data[:, action_dim:], data[:, :action_dim]])
     for i in range(0, n_samples, series_len):
         series = data[i : i + series_len, :]
 
