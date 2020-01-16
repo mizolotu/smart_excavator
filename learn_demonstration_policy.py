@@ -14,7 +14,9 @@ def create_model(n_features, n_labels, n_layers = 2, n_nodes = 256):
     model.add(tf.keras.layers.Masking(mask_value=0., input_shape=(series_len, n_features)))
     for i in range(n_layers - 1):
         model.add(tf.keras.layers.LSTM(n_nodes, activation='relu', return_sequences=True))
+        model.add(tf.keras.layers.Dropout(0.5))
     model.add(tf.keras.layers.LSTM(n_nodes, activation='relu'))
+    model.add(tf.keras.layers.Dropout(0.5))
     model.add(tf.keras.layers.Dense(n_labels, activation='sigmoid'))
     model.compile(optimizer='adam', loss='mse', metrics=['accuracy'])
     return model
