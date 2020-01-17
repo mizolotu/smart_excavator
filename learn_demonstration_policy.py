@@ -6,7 +6,7 @@ def create_model(n_features, n_labels, n_layers=3, n_nodes=256):
     model = tf.keras.models.Sequential([tf.keras.Input(shape=(n_features,))])
     for i in range(n_layers):
         model.add(tf.keras.layers.Dense(n_nodes, activation='relu'))
-        model.add(tf.keras.layers.Dropout(0.5))
+        #model.add(tf.keras.layers.Dropout(0.5))
     model.add(tf.keras.layers.Dense(n_labels, activation='sigmoid'))
     model.add(tf.keras.layers.Reshape((n_labels // n_features, n_features)))
     model.compile(optimizer='adam', loss='mse', metrics=['accuracy'])
