@@ -148,13 +148,13 @@ class ExcavatorEnv(gym.Env):
         # action from demonstration
 
         self._generate_demo_policy()
+        self.trajectory_idx = 0
         demo_action = self.demo_policy[self.trajectory_idx, :]
 
         # remember some parameteres
 
         self.last_step_time = time()
         self.step_count = 0
-        self.trajectory_idx = 0
         self.last_state = state.copy()
         self.last_demo_action = demo_action.copy()
         return np.hstack([state, demo_action])
@@ -282,6 +282,7 @@ class ExcavatorEnv(gym.Env):
     def _generate_demo_policy(self):
         target_reshaped = self.dig_target.reshape(1, self.action_dim)
         self.demo_policy = self.model.predict(target_reshaped)[0]
+        print(self.demo_policy[:, 0] * (self.x_max[0] - self.x_min[0]) + self.x_min[0])
 
     def _calculate_reward(self, x, m, c, t):
         switch_target = False
