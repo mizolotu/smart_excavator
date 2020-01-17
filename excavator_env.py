@@ -10,7 +10,7 @@ class ExcavatorEnv(gym.Env):
 
     def __init__(self, id,
         mws='C:\\Users\\iotli\\PycharmProjects\\SmartExcavator\\mws\\env.mws',
-        obs_dim=9+4,
+        obs_dim=13,
         action_dim=4,
         http_url='http://127.0.0.1:5000',
         discrete_action=None,
@@ -32,19 +32,20 @@ class ExcavatorEnv(gym.Env):
 
         self.episode_count = 0
         self.step_count = 0
-        self.n_steps = 14
+        self.n_steps = 16
         self.n_series = 4
         self.step_count_max = self.n_series * self.n_steps
         self.env_id = id
         self.backend_assigned = False
-        self.target_list = []
+        self.dig_target = None
+        self.emp_target = None
         self.target_idx = 0
         self.http_url = http_url
 
         # state, action and reward coefficients
 
         self.obs_idx = 0
-        self.obs_stack = np.zeros((self.n_steps, self.obs_dim - self.action_dim))
+        self.demo_policy = np.zeros((self.n_steps, self.action_dim))
         self.stick_to_demonstration_policy = 0.95
         self.time_coeff = 0.5
         self.dist_coeff = 0.5
@@ -90,7 +91,7 @@ class ExcavatorEnv(gym.Env):
                 break
             jdata = self._post_target()
         state = self._construct_state(jdata)
-        demo_action = self._predict_demo_action(state)
+        demo_action = self.demo_policy[self.step_count, :]
         x = state[:x_ind]
         m = state[m_ind]
         c = jdata['c']
@@ -106,10 +107,11 @@ class ExcavatorEnv(gym.Env):
             self.obs_idx = 0
             done = True
         elif switch_target:
-            if self.target_idx >= len(self.target_list) - 1:
+            if self.target_idx == 1:
                 self.target_idx = 0
             else:
                 self.target_idx += 1
+                self.dig_target = x
             done = False
         else:
             done = False
@@ -126,7 +128,7 @@ class ExcavatorEnv(gym.Env):
         self._get_mode(new_mode='RESTART')
         self._reset_id()
         self._start_backend()
-        self._request_target_list()
+        self._request_targets()
         self.target_idx = 0
         self._get_mode(new_mode=current_mode)
 
@@ -141,7 +143,7 @@ class ExcavatorEnv(gym.Env):
                 else:
                     sleep(delay)
         state = self._construct_state(jdata)
-        demo_action = self._predict_demo_action(state)
+        demo_action = self.demo_policy[self.step_count, :]
         self.last_step_time = time()
         self.step_count = 0
         self.last_state = state.copy()
@@ -204,20 +206,18 @@ class ExcavatorEnv(gym.Env):
             else:
                 print('Could not start solver {0} :( Trying again...'.format(self.env_id))
 
-    def _request_target_list(self, uri='targets', eps=1e-10):
+    def _request_targets(self, uri='targets', eps=1e-10):
         url = '{0}/{1}'.format(self.http_url, uri)
         target_list = []
-        while len(target_list) == 0:
+        while len(target_list) <= 1:
             try:
                 j = requests.get(url, json={'id': self.env_id}).json()
                 target_list = j['targets']
             except Exception as e:
                 print('Exception when requesting target list:')
                 print(e)
-        self.target_list = []
-        for t in target_list:
-            x = np.array(t)
-            self.target_list.append((x - self.x_min) / (self.x_max - self.x_min + eps))
+        self.dig_target = (np.array(target_list[0]) - self.x_min) / (self.x_max - self.x_min + eps)
+        self.emp_target = (np.array(target_list[1]) - self.x_min) / (self.x_max - self.x_min + eps)
 
     def _action_target(self, action):
         if self.discrete_action is None:
@@ -271,25 +271,24 @@ class ExcavatorEnv(gym.Env):
         state = np.hstack([target - l_std, target - x_std, m_std])
         return state
 
-    def _predict_demo_action(self, state):
-        self.obs_stack[self.obs_idx, :] = state
-        state_reshaped = self.obs_stack.reshape(1, self.n_steps, self.obs_dim - self.action_dim)
-        action = self.model.predict(state_reshaped)[0]
-        self.obs_idx += 1
-        return action
+    def _generate_demo_policy(self):
+        target_reshaped = self.dig_target.reshape(1, self.action_dim)
+        self.demo_policy = self.model.predict(target_reshaped)[0]
 
     def _calculate_reward(self, x, m, c, t):
-        target_bit = self.target_idx % 2
         switch_target = False
         restart_required = False
-        dist_to_target = np.linalg.norm(x - self.target_list[self.target_idx])
+        if self.target_idx == 0:
+            dist_to_target = np.linalg.norm(x - self.dig_target)
+        else:
+            dist_to_target = np.linalg.norm(x - self.emp_target)
         time_elapsed = t / self.t_max
         r = self.dist_coeff * (1 - dist_to_target) + self.time_coeff * (1 - time_elapsed)  - self.collision_coeff * c
         if self.obs_idx == self.n_steps:
             switch_target = True
             self.obs_stack = np.zeros((self.n_steps, self.obs_dim - self.action_dim))
             self.obs_idx = 0
-        elif target_bit == 0:
+        elif self.target_idx == 0:
             if dist_to_target <= self.dist_thr:
                 if m > self.mass_thr:
                     switch_target = True
