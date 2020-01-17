@@ -6,7 +6,7 @@ def create_model(n_features, n_labels, n_layers=3, n_nodes=256):
     model = tf.keras.models.Sequential([tf.keras.Input(shape=(n_features,))])
     for i in range(n_layers):
         model.add(tf.keras.layers.Dense(n_nodes, activation='relu'))
-        model.add(tf.keras.layers.Dropout(0.1))
+        #model.add(tf.keras.layers.Dropout(0.1))
     model.add(tf.keras.layers.Dense(n_labels, activation='sigmoid'))
     model.add(tf.keras.layers.Reshape((n_labels // n_features, n_features)))
     model.compile(optimizer='adam', loss='mse', metrics=['accuracy'])
@@ -21,8 +21,8 @@ def create_lstm_model(n_features, n_labels, series_len, n_layers = 2, n_nodes = 
     model.add(tf.keras.layers.LSTM(n_nodes, activation='relu'))
     model.add(tf.keras.layers.Dropout(0.5))
     model.add(tf.keras.layers.Dense(n_labels, activation='sigmoid'))
-    optimizer = tf.keras.optimizers.Adam(3e-4)
-    model.compile(optimizer=optimizer, loss='mse', metrics=['accuracy'])
+    #optimizer = tf.keras.optimizers.Adam(3e-4)
+    model.compile(optimizer='adam', loss='mse', metrics=['accuracy'])
     return model
 
 if __name__ == '__main__':
