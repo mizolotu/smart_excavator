@@ -127,7 +127,8 @@ def generate_user_input(fname, cycle):
             f.write(line + '\n')
 
 if __name__ == '__main__':
-    data_dir = 'data'
+    data_dir = 'data/raw'
+    save_dir = 'data'
     data_files = [
         join(data_dir, f) for f in listdir(data_dir) if isfile(join(data_dir, f)) and f.endswith('.txt')
     ]
@@ -207,7 +208,7 @@ if __name__ == '__main__':
     key_stats = (np.min(dig_a[:,1]), np.min(emp_a[:,1]), np.mean(dig_a[:, 0]), np.mean(emp_a[:, 0]))
 
     level_file = 'level_points.pkl'
-    with open(join(data_dir, level_file), 'wb') as f:
+    with open(join(save_dir, level_file), 'wb') as f:
         pickle.dump(levels, f)
         pickle.dump(key_points, f)
         pickle.dump(key_stats, f)

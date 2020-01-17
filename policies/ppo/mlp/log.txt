@@ -1,1 +1,16 @@
 Logging to C:\Users\iotli\PycharmProjects\SmartExcavator\policies\ppo\mlp
+------------------------------------------
+| eplenmean               | 27.5         |
+| eprewmean               | 0.00539      |
+| fps                     | 0            |
+| loss/approxkl           | 0.0009527649 |
+| loss/clipfrac           | 0.004464286  |
+| loss/policy_entropy     | 5.676201     |
+| loss/policy_loss        | -0.011537797 |
+| loss/value_loss         | 0.033960678  |
+| misc/explained_variance | 0.0239       |
+| misc/nupdates           | 1            |
+| misc/serial_timesteps   | 56           |
+| misc/time_elapsed       | 164          |
+| misc/total_timesteps    | 56           |
+------------------------------------------

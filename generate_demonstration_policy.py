@@ -170,16 +170,23 @@ def generate_demonstration_dataset(fname, n_series=1000, mws = 'C:\\Users\\iotli
             if dig_target is not None:
                 print('Dig here: {0}'.format(dig_target))
                 t = (dig_target - x_min) / (x_max - x_min + 1e-10)
-                for i in range(cycle.shape[0] - 2):
-                    a = (cycle[i + 2,:] - x_min) / (x_max - x_min + 1e-10)
-                    c = (cycle[i + 1,:] - x_min) / (x_max - x_min + 1e-10)
-                    l = (cycle[i,:] - x_min) / (x_max - x_min + 1e-10)
-                    m = mass[i] / m_max
-                    print(dig_angle, bucket_close_target_idx, t, a, m)
-                    x = np.hstack([t - l, t - c, m, a]).tolist()
-                    line =','.join([str(item) for item in x])
-                    with open(fname, 'a') as f:
-                        f.write(line + '\n')
+                c = (cycle - np.ones((cycle.shape[0], 4))) / (np.ones((cycle.shape[0], 4)) * (x_max - x_min + 1e-10))
+                v = c.reshape(4 * cycle.shape[0])
+                x = np.hstack([t, v])
+                line = ','.join([str(item) for item in x])
+                with open(fname, 'a') as f:
+                    f.write(line + '\n')
+
+                #for i in range(cycle.shape[0] - 2):
+                #    a = (cycle[i + 2,:] - x_min) / (x_max - x_min + 1e-10)
+                #    c = (cycle[i + 1,:] - x_min) / (x_max - x_min + 1e-10)
+                #    l = (cycle[i,:] - x_min) / (x_max - x_min + 1e-10)
+                #    m = mass[i] / m_max
+                #    print(dig_angle, bucket_close_target_idx, t, a, m)
+                #    x = np.hstack([t - l, t - c, m, a]).tolist()
+                #    line =','.join([str(item) for item in x])
+                #    with open(fname, 'a') as f:
+                #        f.write(line + '\n')
 
         requests.post('{0}/{1}'.format(http_url, mode_uri), json={'mode': 'RESTART'}).json()
         print('stopped')
@@ -205,7 +212,7 @@ if __name__ == '__main__':
     # file name to save dataset
 
     fname = 'data/policy_data.txt'
-    #open(fname, 'w').close()
+    open(fname, 'w').close()
 
     # original data
 
