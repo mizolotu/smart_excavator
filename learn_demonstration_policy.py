@@ -59,7 +59,9 @@ if __name__ == '__main__':
     model.save_weights(checkpoint_prefix)
 
     y_test = model.predict(x_train)
+    d_train = np.zeros(n_samples)
+    d_test = np.zeros(n_samples)
     for i in range(n_samples):
-        d_train = np.min(np.sqrt(np.sum((np.ones((series_len, 1)) * x_train[i, :] - y_train[i, :, :]) ** 2, axis=1)))
-        d_test = np.min(np.sqrt(np.sum((np.ones((series_len, 1)) * x_train[i, :] - y_test[i, :, :]) ** 2, axis=1)))
-        print(i, d_train, d_test)
+        d_train[i] = np.min(np.sqrt(np.sum((np.ones((series_len, 1)) * x_train[i, :] - y_train[i, :, :]) ** 2, axis=1)))
+        d_test[i] = np.min(np.sqrt(np.sum((np.ones((series_len, 1)) * x_train[i, :] - y_test[i, :, :]) ** 2, axis=1)))
+    print(n_samples, np.linalg.norm(d_train - d_test) / n_samples)
