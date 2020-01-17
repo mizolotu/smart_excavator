@@ -6,10 +6,11 @@ def create_model(n_features, n_labels, n_layers=3, n_nodes=256):
     model = tf.keras.models.Sequential([tf.keras.Input(shape=(n_features,))])
     for i in range(n_layers):
         model.add(tf.keras.layers.Dense(n_nodes, activation='relu'))
-        #model.add(tf.keras.layers.Dropout(0.1))
+        model.add(tf.keras.layers.Dropout(0.5))
     model.add(tf.keras.layers.Dense(n_labels, activation='sigmoid'))
     model.add(tf.keras.layers.Reshape((n_labels // n_features, n_features)))
     model.compile(optimizer='adam', loss='mse', metrics=['accuracy'])
+    print(model.summary())
     return model
 
 def create_lstm_model(n_features, n_labels, series_len, n_layers = 2, n_nodes = 256):
@@ -51,7 +52,7 @@ if __name__ == '__main__':
 
     # train model
 
-    model = create_model(n_features, n_labels, series_len)
+    model = create_model(n_features, n_labels)
     epochs = 10000
     batch_size = 64
     checkpoint_prefix = "policies/demonstration/last.ckpt"

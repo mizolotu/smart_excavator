@@ -212,7 +212,7 @@ if __name__ == '__main__':
     # file name to save dataset
 
     fname = 'data/policy_data.txt'
-    open(fname, 'w').close()
+    #open(fname, 'w').close()
 
     # original data
 

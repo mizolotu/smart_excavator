@@ -18,23 +18,20 @@ def constfn(val):
     return f
 
 def learn(env, network_,
-    total_timesteps=56*10e4,
+    total_timesteps=64*10e4,
     eval_env = None,
     seed=None,
-    nsteps=56,
+    nsteps=64,
     ent_coef=0.0,
     lr=3e-4,
     vf_coef=0.5,
     max_grad_norm=0.5,
     gamma=0.99,
     lam=0.95,
-    log_interval=10,
+    log_interval=1,
     nminibatches=4,
     noptepochs=4,
     cliprange=0.2,
-    save_interval=1,
-    save_path_='policies/ppo/{0}',
-    load_path_='policies/ppo/{0}',
     model_fn=None,
     **network_kwargs
 ):
@@ -134,15 +131,17 @@ def learn(env, network_,
         max_grad_norm=max_grad_norm
     )
 
-    if save_path_ is not None:
-        format_strs = os.getenv('', 'stdout,log,csv').split(',')
-        logger.configure(osp.abspath(save_path_.format(network_)), format_strs)
+    format_strs = os.getenv('', 'stdout,log,csv').split(',')
+    logger.configure(osp.abspath('policies/ppo/{0}'.format(network_)), format_strs)
 
-    if load_path_ is not None:
-        load_path = osp.expanduser(load_path_.format(network_))
-        ckpt = tf.train.Checkpoint(model=model)
-        manager = tf.train.CheckpointManager(ckpt, load_path, max_to_keep=None)
-        ckpt.restore(manager.latest_checkpoint)
+    checkpoint_directory = osp.join(logger.get_dir(), 'checkpoints')
+    checkpoint = tf.train.Checkpoint(model=model)
+    checkpoint_manager = tf.train.CheckpointManager(checkpoint, directory=checkpoint_directory, max_to_keep=5)
+
+    try:
+        checkpoint.restore(checkpoint_manager.latest_checkpoint)
+    except Exception as e:
+        print(e)
 
     # Instantiate the runner object
 
@@ -223,12 +222,7 @@ def learn(env, network_,
 
             logger.dumpkvs()
 
-        if update % save_interval == 0:
-            checkdir = osp.join(logger.get_dir(), 'checkpoints')
-            os.makedirs(checkdir, exist_ok=True)
-            savepath_last = osp.join(checkdir, 'last.ckpt')
-            print('Saving to {0}'.format(savepath_last))
-            model.save_weights(savepath_last)
+            checkpoint_manager.save()
 
     return model
 # Avoid division error when calculate the mean (in our case if epinfo is empty returns np.nan, not return an error)

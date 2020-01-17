@@ -32,6 +32,7 @@ class ExcavatorEnv(gym.Env):
 
         self.episode_count = 0
         self.step_count = 0
+        self.trajectory_idx = 0
         self.n_steps = 16
         self.n_series = 4
         self.step_count_max = self.n_series * self.n_steps
@@ -44,7 +45,6 @@ class ExcavatorEnv(gym.Env):
 
         # state, action and reward coefficients
 
-        self.obs_idx = 0
         self.demo_policy = np.zeros((self.n_steps, self.action_dim))
         self.stick_to_demonstration_policy = 0.95
         self.time_coeff = 0.5
@@ -91,27 +91,28 @@ class ExcavatorEnv(gym.Env):
                 break
             jdata = self._post_target()
         state = self._construct_state(jdata)
-        demo_action = self.demo_policy[self.step_count, :]
+        demo_action = self.demo_policy[self.trajectory_idx, :]
+        self.trajectory_idx += 1
         x = state[:x_ind]
         m = state[m_ind]
         c = jdata['c']
         self.step_count += 1
         reward, switch_target, restart_required = self._calculate_reward(x, m, c, t_delta)
-        print(self.obs_idx, target, reward, switch_target)
-        if self.step_count >= self.step_count_max - 1:
+        print(self.step_count, self.trajectory_idx, target, reward, switch_target, self.dig_target)
+        if self.step_count == self.step_count_max:
             print('Solver {0} will restart as it has reached maximum step count.'.format(self.env_id))
             done = True
+        elif self.trajectory_idx == self.n_steps:
+            self._generate_demo_policy()
+            self.target_idx = 0
+            self.trajectory_idx = 0
+            done = False
         elif restart_required:
-            print('Solver {0} will restart due to unexpected collision!'.format(self.env_id))
-            self.obs_stack = np.zeros((self.n_steps, self.obs_dim - self.action_dim))
-            self.obs_idx = 0
-            done = True
+            print('Solver {0} should restart due to unexpected collision!'.format(self.env_id))
+            done = False # True
         elif switch_target:
-            if self.target_idx == 1:
-                self.target_idx = 0
-            else:
-                self.target_idx += 1
-                self.dig_target = x
+            self.target_idx += 1
+            self.dig_target = x
             done = False
         else:
             done = False
@@ -143,9 +144,17 @@ class ExcavatorEnv(gym.Env):
                 else:
                     sleep(delay)
         state = self._construct_state(jdata)
-        demo_action = self.demo_policy[self.step_count, :]
+
+        # action from demonstration
+
+        self._generate_demo_policy()
+        demo_action = self.demo_policy[self.trajectory_idx, :]
+
+        # remember some parameteres
+
         self.last_step_time = time()
         self.step_count = 0
+        self.trajectory_idx = 0
         self.last_state = state.copy()
         self.last_demo_action = demo_action.copy()
         return np.hstack([state, demo_action])
@@ -154,7 +163,7 @@ class ExcavatorEnv(gym.Env):
         pass
 
     def _load_demo_policy(self, checkpoint_path='policies/demonstration/last.ckpt'):
-        model = create_model(self.obs_dim - self.action_dim, self.action_dim, series_len=self.n_steps)
+        model = create_model(self.action_dim, self.action_dim * self.n_steps)
         model.load_weights(checkpoint_path)
         return model
 
@@ -267,8 +276,7 @@ class ExcavatorEnv(gym.Env):
         x_std = (x - self.x_min) / (self.x_max - self.x_min + eps)
         l_std = (l - self.x_min) / (self.x_max - self.x_min + eps)
         m_std = m / (self.m_max + eps)
-        target = self.target_list[self.target_idx]
-        state = np.hstack([target - l_std, target - x_std, m_std])
+        state = np.hstack([x_std, l_std, m_std])
         return state
 
     def _generate_demo_policy(self):
@@ -284,21 +292,14 @@ class ExcavatorEnv(gym.Env):
             dist_to_target = np.linalg.norm(x - self.emp_target)
         time_elapsed = t / self.t_max
         r = self.dist_coeff * (1 - dist_to_target) + self.time_coeff * (1 - time_elapsed)  - self.collision_coeff * c
-        if self.obs_idx == self.n_steps:
-            switch_target = True
-            self.obs_stack = np.zeros((self.n_steps, self.obs_dim - self.action_dim))
-            self.obs_idx = 0
-        elif self.target_idx == 0:
+        if self.target_idx == 0:
             if dist_to_target <= self.dist_thr:
                 if m > self.mass_thr:
                     switch_target = True
-        else:
+        elif dist_to_target > self.dist_thr:
             r += self.mass_coeff * m
-            if dist_to_target <= self.dist_thr:
-                if m < self.mass_thr:
-                    switch_target = True
-                    self.obs_stack = np.zeros((self.n_steps, self.obs_dim - self.action_dim))
-                    self.obs_idx = 0
+        else:
+            r -= self.mass_coeff * m
         if c > self.collision_thr:
             restart_required = True
         return r, switch_target, restart_required
