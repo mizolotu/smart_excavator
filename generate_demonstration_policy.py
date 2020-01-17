@@ -170,7 +170,7 @@ def generate_demonstration_dataset(fname, n_series=1000, mws = 'C:\\Users\\iotli
             if dig_target is not None:
                 print('Dig here: {0}'.format(dig_target))
                 t = (dig_target - x_min) / (x_max - x_min + 1e-10)
-                c = (cycle - np.ones((cycle.shape[0], 4))) / (np.ones((cycle.shape[0], 4)) * (x_max - x_min + 1e-10))
+                c = (cycle - np.ones((cycle.shape[0], 1)) * x_min) / (np.ones((cycle.shape[0], 1)) * (x_max - x_min + 1e-10))
                 v = c.reshape(4 * cycle.shape[0])
                 x = np.hstack([t, v])
                 line = ','.join([str(item) for item in x])
