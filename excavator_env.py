@@ -278,8 +278,9 @@ class ExcavatorEnv(gym.Env):
         m = jdata['m']
         x_std = (x - self.x_min) / (self.x_max - self.x_min + eps)
         l_std = (l - self.x_min) / (self.x_max - self.x_min + eps)
+        t_std = self.dig_target
         m_std = m / (self.m_max + eps)
-        state = np.hstack([x_std, l_std, m_std])
+        state = np.hstack([t_std - x_std, t_std - l_std, m_std])
         return state
 
     def _generate_demo_policy(self):
