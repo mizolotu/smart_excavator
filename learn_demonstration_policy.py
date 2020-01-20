@@ -35,10 +35,11 @@ if __name__ == '__main__':
 
     #  get data
 
-    fname = 'data/policy_data.txt'
-    data = np.loadtxt(fname, dtype=float, delimiter=',')
     action_dim = 4
     series_len = 16
+    fname = 'data/policy_data.txt'
+    data = np.loadtxt(fname, dtype=float, delimiter=',')
+    data = np.hstack([data[:, :action_dim], data[:, action_dim + 1:]])
     n_samples = data.shape[0]
     sample_len = data.shape[1]
     assert (sample_len - action_dim) % series_len == 0
