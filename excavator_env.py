@@ -122,7 +122,7 @@ class ExcavatorEnv(gym.Env):
         self.last_state = state.copy()
         self.last_demo_action = demo_action.copy()
         self.last_step_time = time()
-        return np.hstack([state, demo_action]), reward, done, {'r': reward, 'l': self.step_count}
+        return np.hstack([state, self.dig_target - demo_action]), reward, done, {'r': reward, 'l': self.step_count}
 
     def reset(self, delay=1.0, x_ind=4):
 
@@ -160,7 +160,7 @@ class ExcavatorEnv(gym.Env):
         self.step_count = 0
         self.last_state = state.copy()
         self.last_demo_action = demo_action.copy()
-        return np.hstack([state, demo_action])
+        return np.hstack([state, self.dig_target - demo_action])
 
     def render(self, mode='human', close=False):
         pass
