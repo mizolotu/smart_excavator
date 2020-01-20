@@ -45,14 +45,17 @@ if __name__ == '__main__':
     series_len = (sample_len - action_dim) // action_dim
     n_features = action_dim
     n_labels = data.shape[1] - action_dim
-    x_train = data[:, :n_features]
-    y_train = np.zeros((n_samples, series_len, action_dim))
+
+    x = data[:, :n_features]
+    y = np.zeros((n_samples, series_len, action_dim))
     for i in range(n_samples):
-        y_train[i, :, :] = data[i, n_features:].reshape(series_len, action_dim)
-    print(x_train.shape, y_train.shape)
+        y[i, :, :] = data[i, n_features:].reshape(series_len, action_dim)
+    print(x.shape, y.shape)
 
     # train model
 
+    train_percentage = 0.8
+    train_idx = int(0.8 * n_samples)
     model = create_model(n_features, n_labels)
     epochs = 10000
     batch_size = 32
@@ -61,15 +64,15 @@ if __name__ == '__main__':
         model.load_weights(checkpoint_prefix)
     except Exception as e:
         print(e)
-        model.fit(x_train, y_train, epochs=epochs, batch_size=batch_size)
+        model.fit(x, y, validation_split=train_percentage, epochs=epochs, batch_size=batch_size)
         model.save_weights(checkpoint_prefix)
 
-    y_test = model.predict(x_train)
+    y_test = model.predict(x)
     d_train = np.zeros(n_samples)
     d_test = np.zeros(n_samples)
     for i in range(n_samples):
-        d_train[i] = np.min(np.sqrt(np.sum((np.ones((series_len, 1)) * x_train[i, :] - y_train[i, :, :]) ** 2, axis=1)))
-        d_test[i] = np.min(np.sqrt(np.sum((np.ones((series_len, 1)) * x_train[i, :] - y_test[i, :, :]) ** 2, axis=1)))
+        d_train[i] = np.min(np.sqrt(np.sum((np.ones((series_len, 1)) * x[i, :] - y[i, :, :]) ** 2, axis=1)))
+        d_test[i] = np.min(np.sqrt(np.sum((np.ones((series_len, 1)) * x[i, :] - y_test[i, :, :]) ** 2, axis=1)))
     print(n_samples, np.linalg.norm(d_train - d_test) / n_samples)
 
     #t = np.array([[0.70215614, 0.54973221, 0.69446078, 0.31226379]])

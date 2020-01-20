@@ -33,7 +33,7 @@ class ExcavatorEnv(gym.Env):
         self.episode_count = 0
         self.step_count = 0
         self.trajectory_idx = 0
-        self.n_steps = 16
+        self.n_steps = 32
         self.n_series = 4
         self.step_count_max = self.n_series * self.n_steps
         self.env_id = id
@@ -46,7 +46,7 @@ class ExcavatorEnv(gym.Env):
         # state, action and reward coefficients
 
         self.demo_policy = np.zeros((self.n_steps, self.action_dim))
-        self.stick_to_demonstration_policy = 0.95
+        self.stick_to_demonstration_policy = 0.9
         self.time_coeff = 0.5
         self.dist_coeff = 0.5
         self.mass_coeff = 1.0
