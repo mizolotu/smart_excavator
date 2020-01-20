@@ -91,7 +91,7 @@ if __name__ == '__main__':
 
     envs = [
         {'backend_assigned': False, 'backend_running': False, 'mode': 'AI_TRAIN', 'target_list': targets, 'x': None, 'l': None, 't': None, 'y': None, 'm': None, 'c': None},
-        #{'backend_assigned': False, 'backend_running': False, 'mode': 'AI_TRAIN', 'target_list': targets, 'x': None, 'l': None, 't': None, 'y': None, 'm': None, 'c': None}
+        {'backend_assigned': False, 'backend_running': False, 'mode': 'AI_TRAIN', 'target_list': targets, 'x': None, 'l': None, 't': None, 'y': None, 'm': None, 'c': None}
     ]
 
     # create environments

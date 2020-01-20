@@ -9,7 +9,7 @@ app = Flask(__name__)
 log = logging.getLogger('werkzeug')
 log.disabled = True
 
-def retrieve_original_dataset(data_file='data/level_points.pkl', nsteps=16):
+def retrieve_original_dataset(data_file='data/level_points.pkl', nsteps=32):
     with open(data_file, 'rb') as f:
         levels = pickle.load(f)
     data = []
@@ -119,7 +119,7 @@ def target():
         data['running'] = backend['running']
         return jsonify(data)
 
-def generate_demonstration_dataset(fname, n_series=1000, mws = 'C:\\Users\\iotli\\PycharmProjects\\SmartExcavator\\mws\\env.mws', http_url='http://127.0.0.1:5000', mode_uri='mode', delay=1.0, a_thr=3.0, x_thr=5.0, t_thr=3.0, m_thr=50.0):
+def generate_demonstration_dataset(fname, n_series=1000, mws = 'C:\\Users\\iotli\\PycharmProjects\\SmartExcavator\\mws\\env.mws', http_url='http://127.0.0.1:5000', mode_uri='mode', delay=1.0, a_thr=3.0, x_thr=5.0, t_thr=3.0, m_thr=50.0, m_max=1000):
     regkey = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r'Software\WOW6432Node\Mevea\Mevea Simulation Software')
     (solverpath, _) = winreg.QueryValueEx(regkey, 'InstallPath')
     solverpath += r'\Bin\MeveaSolver.exe'
@@ -172,7 +172,8 @@ def generate_demonstration_dataset(fname, n_series=1000, mws = 'C:\\Users\\iotli
                 t = (dig_target - x_min) / (x_max - x_min + 1e-10)
                 c = (cycle - np.ones((cycle.shape[0], 1)) * x_min) / (np.ones((cycle.shape[0], 1)) * (x_max - x_min + 1e-10))
                 v = c.reshape(4 * cycle.shape[0])
-                x = np.hstack([t, v])
+                m = mass[bucket_close_target_idx] / m_max
+                x = np.hstack([t, m, v])
                 line = ','.join([str(item) for item in x])
                 with open(fname, 'a') as f:
                     f.write(line + '\n')
@@ -212,7 +213,7 @@ if __name__ == '__main__':
     # file name to save dataset
 
     fname = 'data/policy_data.txt'
-    #open(fname, 'w').close()
+    open(fname, 'w').close()
 
     # original data
 

@@ -2,7 +2,10 @@ import tensorflow as tf
 import numpy as np
 import sys, os
 
-def create_model(n_features, n_labels, n_layers=3, n_nodes=256):
+from matplotlib import pyplot as pp
+from misc import moving_average
+
+def create_model(n_features, n_labels, n_layers=2, n_nodes=64):
     model = tf.keras.models.Sequential([tf.keras.Input(shape=(n_features,))])
     for i in range(n_layers):
         model.add(tf.keras.layers.Dense(n_nodes, activation='relu'))
@@ -56,8 +59,12 @@ if __name__ == '__main__':
     epochs = 10000
     batch_size = 64
     checkpoint_prefix = "policies/demonstration/last.ckpt"
-    model.fit(x_train, y_train, epochs=epochs, batch_size=batch_size)
-    model.save_weights(checkpoint_prefix)
+    try:
+        model.load_weights(checkpoint_prefix)
+    except Exception as e:
+        print(e)
+        model.fit(x_train, y_train, epochs=epochs, batch_size=batch_size)
+        model.save_weights(checkpoint_prefix)
 
     y_test = model.predict(x_train)
     d_train = np.zeros(n_samples)
@@ -66,3 +73,10 @@ if __name__ == '__main__':
         d_train[i] = np.min(np.sqrt(np.sum((np.ones((series_len, 1)) * x_train[i, :] - y_train[i, :, :]) ** 2, axis=1)))
         d_test[i] = np.min(np.sqrt(np.sum((np.ones((series_len, 1)) * x_train[i, :] - y_test[i, :, :]) ** 2, axis=1)))
     print(n_samples, np.linalg.norm(d_train - d_test) / n_samples)
+
+    t = np.array([[0.70215614, 0.54973221, 0.69446078, 0.31226379]])
+    p = model.predict(t)[0]
+    for i in range(4):
+        pp.plot(p[:,i])
+        pp.plot()
+        pp.show()
