@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 import sys, os
 
-def create_model(n_features, n_labels, n_layers=3, n_nodes=2048):
+def create_model(n_features, n_labels, n_layers=2, n_nodes=2048):
     model = tf.keras.models.Sequential([tf.keras.Input(shape=(n_features,))])
     for i in range(n_layers):
         model.add(tf.keras.layers.Dense(n_nodes, activation='relu'))
