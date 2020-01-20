@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 import sys, os
 
-def create_model(n_features, n_labels, n_layers=2, n_nodes=64):
+def create_model(n_features, n_labels, n_layers=2, n_nodes=256):
     model = tf.keras.models.Sequential([tf.keras.Input(shape=(n_features,))])
     for i in range(n_layers):
         model.add(tf.keras.layers.Dense(n_nodes, activation='relu'))
@@ -54,8 +54,8 @@ if __name__ == '__main__':
 
     # train model
 
-    train_percentage = 0.8
-    train_idx = int(0.8 * n_samples)
+    train_percentage = 0.5
+    train_idx = int(train_percentage * n_samples)
     model = create_model(n_features, n_labels)
     epochs = 10000
     batch_size = 32
