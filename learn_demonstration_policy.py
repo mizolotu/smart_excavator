@@ -36,13 +36,13 @@ if __name__ == '__main__':
     #  get data
 
     action_dim = 4
-    series_len = 16
     fname = 'data/policy_data.txt'
     data = np.loadtxt(fname, dtype=float, delimiter=',')
-    data = np.hstack([data[:, :action_dim], data[:, action_dim + 1:]])
+    data = np.hstack([data[:, :action_dim], data[:, action_dim + 1:]])  # remove mass
     n_samples = data.shape[0]
     sample_len = data.shape[1]
-    assert (sample_len - action_dim) % series_len == 0
+    assert (sample_len - action_dim) % action_dim == 0
+    series_len = (sample_len - action_dim) // action_dim
     n_features = action_dim
     n_labels = data.shape[1] - action_dim
     x_train = data[:, :n_features]
