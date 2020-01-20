@@ -54,8 +54,8 @@ if __name__ == '__main__':
     # train model
 
     model = create_model(n_features, n_labels)
-    epochs = 10000
-    batch_size = 64
+    epochs = 100000
+    batch_size = 32
     checkpoint_prefix = "policies/demonstration/last.ckpt"
     try:
         model.load_weights(checkpoint_prefix)
