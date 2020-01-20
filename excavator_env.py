@@ -74,6 +74,8 @@ class ExcavatorEnv(gym.Env):
         else:
             self.action_space = gym.spaces.Discrete(self.discrete_action * action_dim)
 
+        self.debug = False
+
     def step(self, action, x_ind=4, m_ind=-1, x_thr=5.0):
         real_action = self.stick_to_demonstration_policy * self.last_demo_action + (1 - self.stick_to_demonstration_policy) * action
         target = np.clip(self.x_min + (self.x_max - self.x_min) * real_action, self.x_min, self.x_max)
@@ -98,7 +100,8 @@ class ExcavatorEnv(gym.Env):
         c = jdata['c']
         self.step_count += 1
         reward, switch_target, restart_required = self._calculate_reward(x, m, c, t_delta)
-        print(self.step_count, self.trajectory_idx, real_action, reward, switch_target, self.dig_target)
+        if self.debug:
+            print(self.step_count, self.trajectory_idx, real_action, reward, switch_target, self.dig_target)
         if self.step_count == self.step_count_max:
             print('Solver {0} will restart as it has reached maximum step count.'.format(self.env_id))
             done = True
@@ -282,7 +285,8 @@ class ExcavatorEnv(gym.Env):
     def _generate_demo_policy(self):
         target_reshaped = self.dig_target.reshape(1, self.action_dim)
         self.demo_policy = self.model.predict(target_reshaped)[0]
-        print(self.demo_policy[:, 0] * (self.x_max[0] - self.x_min[0]) + self.x_min[0])
+        if self.debug:
+            print(self.demo_policy[:, 0] * (self.x_max[0] - self.x_min[0]) + self.x_min[0])
 
     def _calculate_reward(self, x, m, c, t):
         switch_target = False
@@ -291,7 +295,8 @@ class ExcavatorEnv(gym.Env):
             dist_to_target = np.linalg.norm(x - self.dig_target)
         else:
             dist_to_target = np.linalg.norm(x - self.emp_target)
-        print(self.target_idx, dist_to_target)
+        if self.debug:
+            print(self.target_idx, dist_to_target)
         time_elapsed = t / self.t_max
         r = self.dist_coeff * (1 - dist_to_target) + self.time_coeff * (1 - time_elapsed)  - self.collision_coeff * c
         if self.target_idx == 0:
