@@ -2,9 +2,6 @@ import tensorflow as tf
 import numpy as np
 import sys, os
 
-from matplotlib import pyplot as pp
-from misc import moving_average
-
 def create_model(n_features, n_labels, n_layers=2, n_nodes=64):
     model = tf.keras.models.Sequential([tf.keras.Input(shape=(n_features,))])
     for i in range(n_layers):
@@ -74,9 +71,9 @@ if __name__ == '__main__':
         d_test[i] = np.min(np.sqrt(np.sum((np.ones((series_len, 1)) * x_train[i, :] - y_test[i, :, :]) ** 2, axis=1)))
     print(n_samples, np.linalg.norm(d_train - d_test) / n_samples)
 
-    t = np.array([[0.70215614, 0.54973221, 0.69446078, 0.31226379]])
-    p = model.predict(t)[0]
-    for i in range(4):
-        pp.plot(p[:,i])
-        pp.plot()
-        pp.show()
+    #t = np.array([[0.70215614, 0.54973221, 0.69446078, 0.31226379]])
+    #p = model.predict(t)[0]
+    #for i in range(4):
+    #    pp.plot(p[:,i])
+    #    pp.plot()
+    #    pp.show()
