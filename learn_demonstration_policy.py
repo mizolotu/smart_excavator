@@ -89,8 +89,9 @@ if __name__ == '__main__':
     x = np.zeros((n_samples, n_steps, n_features))
     y = np.zeros((n_samples, n_steps, n_features))
     for i in range(n_samples):
-        traj = np.ones((n_steps + 1, 1)).dot(data[i:i+1, :n_features]) - data[i, n_features:].reshape(series_len, action_dim)
-        x[i, :, :] = traj[:-1, :]
+        target_minus_traj = np.ones((n_steps + 1, 1)).dot(data[i:i+1, :n_features]) - data[i, n_features:].reshape(series_len, action_dim)
+        traj = data[i, n_features:].reshape(series_len, action_dim)
+        x[i, :, :] = target_minus_traj[:-1, :]
         y[i, :, :] = traj[1:, :]
     print(x.shape, y.shape)
 
