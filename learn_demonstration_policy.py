@@ -4,42 +4,36 @@ import sys, os
 
 from matplotlib import pyplot as pp
 
-def create_model(n_samples, n_features, n_nodes=256):
+def create_model(n_steps, n_features, n_nodes=256):
 
     # create train model
 
-    model_tr = tf.keras.models.Sequential([tf.keras.Input(shape=(1, n_features), batch_size=n_samples)])
-    model_tr.add(tf.keras.layers.LSTM(n_nodes, activation='relu', return_sequences=False, stateful=True))
+    model_tr = tf.keras.models.Sequential([tf.keras.Input(shape=(n_steps, n_features))])
+    model_tr.add(tf.keras.layers.LSTM(n_nodes, activation='relu'))
     model_tr.add(tf.keras.layers.Dropout(0.5))
     model_tr.add(tf.keras.layers.Dense(n_features, activation='sigmoid'))
     model_tr.compile(optimizer='adam', loss='mse', metrics=['accuracy'])
     print(model_tr.summary())
 
-    # create inference model
-
-    model_inf = tf.keras.models.Sequential([tf.keras.Input(shape=(1, n_features), batch_size=1)])
-    model_inf.add(tf.keras.layers.LSTM(n_nodes, activation='relu', return_sequences=False, stateful=True))
-    model_inf.add(tf.keras.layers.Dense(n_features, activation='sigmoid'))
-    model_inf.compile(optimizer='adam', loss='mse', metrics=['accuracy'])
-    print(model_inf.summary())
-
-    return model_tr, model_inf
+    return model_tr
 
 def validate_and_plot(model, x0, y, w=4, h=4):
-    p = np.zeros((x0.shape[0], y.shape[1], y.shape[2]))
-    p[:, 0, :]  = x0
-    for i in range(x0.shape[0]):
-        for j in range(y.shape[1] - 1):
-            pij = model.predict(p[i:i+1, j:j+1, :])
-            p[i, j + 1, :] = pij
-            model.reset_states()
+    p = np.zeros((x0.shape[0] // n_steps, n_steps, y.shape[1]))
+    r = np.zeros((x0.shape[0] // n_steps, n_steps, y.shape[1]))
+    for i in range(x0.shape[0] // n_steps):
+        r[i, :, :] = y[i * n_steps : (i+1) * n_steps, :]
+        x_ = x0[i * n_steps, :, :]
+        for j in range(n_steps):
+            pij = model.predict(x_.reshape(1, n_steps, n_features))
+            p[i, j, :] = pij
+            x_ = np.vstack([x_[1:, :], pij])
     fig, axs = pp.subplots(w, h)
     fig.set_size_inches(18.5, 10.5)
     for i in range(w):
         for j in range(h):
             idx = i * w + j
             axs[i, j].plot(p[idx, :, :])
-            axs[i, j].plot(y[idx, :, :], '--')
+            axs[i, j].plot(r[idx, :, :], '--')
     fig.savefig(validation_fig, dpi=fig.dpi)
     pp.close(fig)
 
@@ -86,42 +80,38 @@ if __name__ == '__main__':
     n_features = action_dim
     n_steps = (data.shape[1] - action_dim) // n_features - 1
 
-    x = np.zeros((n_samples, n_steps, n_features))
-    y = np.zeros((n_samples, n_steps, n_features))
+    x = np.zeros((n_samples * n_steps, n_steps, n_features))
+    y = np.zeros((n_samples * n_steps, n_features))
     for i in range(n_samples):
         target_minus_traj = np.ones((n_steps + 1, 1)).dot(data[i:i+1, :n_features]) - data[i, n_features:].reshape(series_len, action_dim)
         traj = data[i, n_features:].reshape(series_len, action_dim)
-        x[i, :, :] = target_minus_traj[:-1, :]
-        y[i, :, :] = traj[1:, :]
+        for j in range(n_steps):
+            x[i * n_steps + j, n_steps-j-1:n_steps, :] = target_minus_traj[:j+1, :]
+            y[i * n_steps + j, :] = traj[j+1, :]
     print(x.shape, y.shape)
 
     # train model
 
     n_validation = 16
     epochs = 10000
-    batch_size = 32
+    batch_size = 31
     checkpoint_prefix = "policies/demonstration/last.ckpt"
     validation_fig = "policies/demonstration/validation.png"
 
-    idx = np.arange(n_samples)
-    np.random.shuffle(idx)
-    x_train = x[n_validation:, :, :]
-    y_train = y[n_validation:, :, :]
-    x_val = x[:n_validation, :, :]
-    y_val = y[:n_validation, :, :]
-    model_tr, model_inf = create_model(n_samples - n_validation, n_features)
+    x_train = x[n_validation * n_steps:, :, :]
+    y_train = y[n_validation * n_steps:, :]
+    x_val = x[:n_validation * n_steps, :, :]
+    y_val = y[:n_validation* n_steps, :]
+    model = create_model(n_steps, n_features)
     try:
-        model_inf.load_weights(checkpoint_prefix)
+        model.load_weights(checkpoint_prefix)
     except Exception as e:
         print(e)
         for epoch in range(epochs):
-            for i in range(n_steps):
-                h = model_tr.fit(x_train[:, i:i+1, :], y_train[:, i, :], verbose=False)
-                model_tr.reset_states()
+            h = model.fit(x_train, y_train, verbose=False, batch_size=batch_size)
             if epoch % (epochs // 100) == 0:
                 print(epoch, h.history)
-                model_inf.set_weights(model_tr.get_weights())
-                validate_and_plot(model_inf, x_val[:, 0, :], y_val)
-                model_inf.save_weights(checkpoint_prefix)
+                validate_and_plot(model, x_val, y_val)
+        model.save_weights(checkpoint_prefix)
 
-    validate_and_plot(model_inf, x_val[:, 0, :], y_val)
+    validate_and_plot(model, x_val[:, 0, :], y_val)
