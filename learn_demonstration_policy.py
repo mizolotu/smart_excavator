@@ -4,11 +4,11 @@ import sys, os
 
 from matplotlib import pyplot as pp
 
-def create_model(n_steps, n_features, n_nodes=256):
+def create_model(n_samples, n_features, n_nodes=256):
 
     # create train model
 
-    model_tr = tf.keras.models.Sequential([tf.keras.Input(shape=(1, n_features), batch_size=n_steps)])
+    model_tr = tf.keras.models.Sequential([tf.keras.Input(shape=(1, n_features), batch_size=n_samples)])
     model_tr.add(tf.keras.layers.LSTM(n_nodes, activation='relu', return_sequences=False, stateful=True))
     model_tr.add(tf.keras.layers.Dropout(0.5))
     model_tr.add(tf.keras.layers.Dense(n_features, activation='sigmoid'))
@@ -31,7 +31,6 @@ def validate_and_plot(model, x0, y, w=4, h=4):
     for i in range(x0.shape[0]):
         for j in range(y.shape[1] - 1):
             pij = model.predict(p[i:i+1, j:j+1, :])
-            print(i,j, pij)
             p[i, j + 1, :] = pij
             model.reset_states()
     fig, axs = pp.subplots(w, h)
@@ -42,6 +41,7 @@ def validate_and_plot(model, x0, y, w=4, h=4):
             axs[i, j].plot(p[idx, :, :])
             axs[i, j].plot(y[idx, :, :], '--')
     fig.savefig(validation_fig, dpi=fig.dpi)
+    pp.close(fig)
 
 def create_traj_model(n_features, n_labels, n_layers=2, n_nodes=2048):
     model = tf.keras.models.Sequential([tf.keras.Input(shape=(n_features,))])
@@ -108,14 +108,14 @@ if __name__ == '__main__':
     y_train = y[n_validation:, :, :]
     x_val = x[:n_validation, :, :]
     y_val = y[:n_validation, :, :]
-    model_tr, model_inf = create_model(n_steps, n_features)
+    model_tr, model_inf = create_model(n_samples - n_validation, n_features)
     try:
         model_inf.load_weights(checkpoint_prefix)
     except Exception as e:
         print(e)
         for epoch in range(epochs):
-            for i in range(n_samples - n_validation):
-                h = model_tr.fit(x_train[i:i+1, :, :].reshape(n_steps, 1, n_features), y_train[i:i+1, :, :].reshape(n_steps, n_features), verbose=False)
+            for i in range(n_steps):
+                h = model_tr.fit(x_train[:, i:i+1, :], y_train[:, i, :], verbose=False)
                 model_tr.reset_states()
             if epoch % (epochs // 100) == 0:
                 print(epoch, h.history)
