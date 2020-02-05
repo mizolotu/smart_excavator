@@ -1,5 +1,4 @@
 import os
-import os.path as osp
 import time
 from collections import deque
 import pickle
@@ -9,9 +8,9 @@ from baselines.ddpg.models import Actor, Critic
 from baselines.ddpg.memory import Memory
 from baselines.ddpg.noise import AdaptiveParamNoiseSpec, NormalActionNoise, OrnsteinUhlenbeckActionNoise
 from baselines.common import set_global_seeds
+import baselines.common.tf_util as U
 
 from baselines import logger
-import tensorflow as tf
 import numpy as np
 
 try:
@@ -19,12 +18,11 @@ try:
 except ImportError:
     MPI = None
 
-def learn(network, env,
+def learn(network, env, total_timesteps,
+          nsteps=None,
+          log_interval=None,
           seed=None,
-          total_timesteps=None,
           nb_epochs=None, # with default settings, perform 1M steps total
-          nb_epoch_cycles=20,
-          nb_rollout_steps=100,
           reward_scale=1.0,
           render=False,
           render_eval=False,
@@ -32,7 +30,7 @@ def learn(network, env,
           normalize_returns=False,
           normalize_observations=True,
           critic_l2_reg=1e-2,
-          actor_lr=1e-4,
+          actor_lr=1e-3,
           critic_lr=1e-3,
           popart=False,
           gamma=0.99,
@@ -43,16 +41,13 @@ def learn(network, env,
           tau=0.01,
           eval_env=None,
           param_noise_adaption_interval=50,
-          load_path=None,
           **network_kwargs):
 
     set_global_seeds(seed)
-
-    if total_timesteps is not None:
-        assert nb_epochs is None
-        nb_epochs = int(total_timesteps) // (nb_epoch_cycles * nb_rollout_steps)
-    else:
-        nb_epochs = 500
+    batch_size = nsteps
+    nenvs = env.num_envs
+    nb_rollout_steps = nsteps
+    nb_epoch_cycles = log_interval
 
     if MPI is not None:
         rank = MPI.COMM_WORLD.Get_rank()
@@ -63,8 +58,8 @@ def learn(network, env,
     assert (np.abs(env.action_space.low) == env.action_space.high).all()  # we assume symmetric actions.
 
     memory = Memory(limit=int(1e6), action_shape=env.action_space.shape, observation_shape=env.observation_space.shape)
-    critic = Critic(nb_actions, ob_shape=env.observation_space.shape, network=network, **network_kwargs)
-    actor = Actor(nb_actions, ob_shape=env.observation_space.shape, network=network, **network_kwargs)
+    critic = Critic(nenvs, network=network, **network_kwargs)
+    actor = Actor(nb_actions, nenvs, network=network, **network_kwargs)
 
     action_noise = None
     param_noise = None
@@ -88,35 +83,33 @@ def learn(network, env,
     max_action = env.action_space.high
     logger.info('scaling actions by {} before executing in env'.format(max_action))
 
-    agent = DDPG(actor, critic, memory, env.observation_space.shape, env.action_space.shape,
+    if 'lstm' in network:
+        step_batch = nenvs * nsteps
+        state_size = int(network.split('_')[1])
+    else:
+        step_batch = None
+        state_size = None
+
+    agent = DDPG(actor, critic, memory, env.observation_space.shape, env.action_space.shape, nenvs, step_batch=step_batch, state_size=state_size,
         gamma=gamma, tau=tau, normalize_returns=normalize_returns, normalize_observations=normalize_observations,
         batch_size=batch_size, action_noise=action_noise, param_noise=param_noise, critic_l2_reg=critic_l2_reg,
         actor_lr=actor_lr, critic_lr=critic_lr, enable_popart=popart, clip_norm=clip_norm,
         reward_scale=reward_scale)
+
     logger.info('Using agent with the following configuration:')
     logger.info(str(agent.__dict__.items()))
 
-    if load_path is not None:
-        load_path = osp.expanduser(load_path)
-        ckpt = tf.train.Checkpoint(model=agent)
-        manager = tf.train.CheckpointManager(ckpt, load_path, max_to_keep=None)
-        ckpt.restore(manager.latest_checkpoint)
-        print("Restoring from {}".format(manager.latest_checkpoint))
-
     eval_episode_rewards_history = deque(maxlen=100)
     episode_rewards_history = deque(maxlen=100)
-
+    sess = U.get_session()
     # Prepare everything.
-    agent.initialize()
+    agent.initialize(sess)
+    sess.graph.finalize()
 
     agent.reset()
 
-    obs = env.reset()
-    if eval_env is not None:
-        eval_obs = eval_env.reset()
-    nenvs = obs.shape[0]
 
-    episode_reward = np.zeros(nenvs, dtype = np.float32) #vector
+
     episode_step = np.zeros(nenvs, dtype = int) # vector
     episodes = 0 #scalar
     t = 0 # scalar
@@ -127,22 +120,44 @@ def learn(network, env,
 
     start_time = time.time()
 
-    epoch_episode_rewards = []
+
     epoch_episode_steps = []
     epoch_actions = []
     epoch_qs = []
     epoch_episodes = 0
-    for epoch in range(nb_epochs):
+    for epoch in range(100):
+
+        epoch_episode_rewards = []
+
         for cycle in range(nb_epoch_cycles):
+
+            #obs = np.zeros((nenvs, nsteps, env.observation_space.shape[0]))
+            mask = np.ones((nenvs, nsteps))
+
+            obs = env.reset()
+
+            if state_size is not None:
+                state = np.zeros((nenvs, 2 * state_size))
+
             # Perform rollouts.
             if nenvs > 1:
                 # if simulating multiple envs in parallel, impossible to reset agent at the end of the episode in each
                 # of the environments, so resetting here instead
                 agent.reset()
+
+            episode_reward = np.zeros(nenvs, dtype=np.float32)  # vector
+
             for t_rollout in range(nb_rollout_steps):
+
                 # Predict next action.
-                action, q, _, _ = agent.step(tf.constant(obs), apply_noise=True, compute_Q=True)
-                action, q = action.numpy(), q.numpy()
+
+                #obs[:, t_rollout, :] = obs_
+                #mask[:, t_rollout] = False
+
+                if state_size is not None:
+                    action, q, _, new_state = agent.step(obs, states=state, masks=mask, apply_noise=True, compute_Q=True)
+                else:
+                    action, q, _, new_state = agent.step(obs, apply_noise=True, compute_Q=True)
 
                 # Execute next action.
                 if rank == 0 and render:
@@ -168,7 +183,7 @@ def learn(network, env,
                 for d in range(len(done)):
                     if done[d]:
                         # Episode done.
-                        epoch_episode_rewards.append(episode_reward[d])
+
                         episode_rewards_history.append(episode_reward[d])
                         epoch_episode_steps.append(episode_step[d])
                         episode_reward[d] = 0.
@@ -178,6 +193,8 @@ def learn(network, env,
                         if nenvs == 1:
                             agent.reset()
 
+            episode_reward /= nsteps
+            epoch_episode_rewards.extend(episode_reward)
 
             # Train.
             epoch_actor_losses = []
@@ -186,9 +203,7 @@ def learn(network, env,
             for t_train in range(nb_train_steps):
                 # Adapt param noise, if necessary.
                 if memory.nb_entries >= batch_size and t_train % param_noise_adaption_interval == 0:
-                    batch = agent.memory.sample(batch_size=batch_size)
-                    obs0 = tf.constant(batch['obs0'])
-                    distance = agent.adapt_param_noise(obs0)
+                    distance = agent.adapt_param_noise()
                     epoch_adaptive_distances.append(distance)
 
                 cl, al = agent.train()
@@ -226,11 +241,13 @@ def learn(network, env,
         duration = time.time() - start_time
         stats = agent.get_stats()
         combined_stats = stats.copy()
-        combined_stats['rollout/return'] = np.mean(epoch_episode_rewards)
+        combined_stats['eprewmean'] = np.mean(epoch_episode_rewards)
+        combined_stats['eprewmin'] = np.min(epoch_episode_rewards)
+        combined_stats['eprewmax'] = np.max(epoch_episode_rewards)
         combined_stats['rollout/return_std'] = np.std(epoch_episode_rewards)
-        combined_stats['rollout/return_history'] = np.mean(episode_rewards_history)
-        combined_stats['rollout/return_history_std'] = np.std(episode_rewards_history)
-        combined_stats['rollout/episode_steps'] = np.mean(epoch_episode_steps)
+        #combined_stats['rollout/return_history'] = np.mean(episode_rewards_history)
+        #combined_stats['rollout/return_history_std'] = np.std(episode_rewards_history)
+        #combined_stats['rollout/episode_steps'] = np.mean(epoch_episode_steps)
         combined_stats['rollout/actions_mean'] = np.mean(epoch_actions)
         combined_stats['rollout/Q_mean'] = np.mean(epoch_qs)
         combined_stats['train/loss_actor'] = np.mean(epoch_actor_losses)
@@ -281,5 +298,5 @@ def learn(network, env,
                 with open(os.path.join(logdir, 'eval_env_state.pkl'), 'wb') as f:
                     pickle.dump(eval_env.get_state(), f)
 
-
+    agent.sess.close()
     return agent

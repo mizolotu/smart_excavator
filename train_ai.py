@@ -1,7 +1,8 @@
-import json, logging
+import json, logging, os
 from excavator_env import ExcavatorEnv
 from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
-from baselines.ppo2.ppo2 import learn
+from baselines.ppo2.ppo2 import learn as learn_ppo
+from baselines.ddpg.ddpg import learn as learn_ddpg
 from threading import Thread
 from flask import Flask, jsonify, request
 
@@ -83,6 +84,10 @@ def target():
 
 if __name__ == '__main__':
 
+    # comment the line below to enable CUDA
+
+
+
     # target lists
 
     targets = [[72.77621012856298, 448.1429081568389, 706.6441233973571, 257.47653181221153], [-76, 608, 413, 232]]
@@ -96,9 +101,11 @@ if __name__ == '__main__':
 
     # create environments
 
+    nsteps = 128
+    nupdates = 1000
     env_fns = [create_env(key) for key in range(len(envs))]
     env = SubprocVecEnv(env_fns)
-    reset_th = Thread(target=learn, args=(env, 'mlp'))
+    reset_th = Thread(target=learn_ppo, args=('mlp', env, len(envs) * nsteps * nupdates))
     reset_th.start()
 
     # start http server

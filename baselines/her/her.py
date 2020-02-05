@@ -97,7 +97,6 @@ def learn(*, network, env, total_timesteps,
     **kwargs
 ):
 
-    raise TypeError('HER is not supported in TF2 branch yet, we are still working on it.')
     override_params = override_params or {}
     if MPI is not None:
         rank = MPI.COMM_WORLD.Get_rank()
@@ -139,11 +138,9 @@ def learn(*, network, env, total_timesteps,
         logger.warn()
 
     dims = config.configure_dims(params)
-    print('dims are {}'.format(dims))
     policy = config.configure_ddpg(dims=dims, params=params, clip_return=clip_return)
-    #TODO: load path
-    # if load_path is not None:
-    #     tf_util.load_variables(load_path)
+    if load_path is not None:
+        tf_util.load_variables(load_path)
 
     rollout_params = {
         'exploit': False,

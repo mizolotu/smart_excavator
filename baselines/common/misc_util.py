@@ -55,7 +55,7 @@ def set_global_seeds(i):
     myseed = i  + 1000 * rank if i is not None else None
     try:
         import tensorflow as tf
-        tf.random.set_seed(myseed)
+        tf.set_random_seed(myseed)
     except ImportError:
         pass
     np.random.seed(myseed)

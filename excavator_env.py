@@ -1,6 +1,7 @@
 import winreg, subprocess, gym, requests
 import numpy as np
-import tensorflow as tf
+
+from misc import moving_average
 from time import sleep, time
 from learn_demonstration_policy import create_model
 
@@ -46,11 +47,12 @@ class ExcavatorEnv(gym.Env):
         # state, action and reward coefficients
 
         self.demo_policy = np.zeros((self.n_steps, self.action_dim))
-        self.stick_to_demonstration_policy = 0.9
+        self.stick_to_demonstration_policy = 1.0
+        self.improvisation = 0.0
         self.time_coeff = 0.5
         self.dist_coeff = 0.5
         self.mass_coeff = 1.0
-        self.collision_coeff = 10.0
+        self.collision_coeff = 0.0
         self.dist_thr = 0.01
         self.mass_thr = 0.05
         self.collision_thr = 0
@@ -77,8 +79,11 @@ class ExcavatorEnv(gym.Env):
         self.debug = False
 
     def step(self, action, x_ind=4, m_ind=-1, x_thr=5.0):
-        real_action = self.stick_to_demonstration_policy * self.last_demo_action + (1 - self.stick_to_demonstration_policy) * action
+        action = np.clip(action, self.action_space.low, self.action_space.high)
+        real_action = self.stick_to_demonstration_policy * self.last_demo_action + self.improvisation * action
         target = np.clip(self.x_min + (self.x_max - self.x_min) * real_action, self.x_min, self.x_max)
+        #print(self.last_demo_action, action, real_action, target)
+
         jdata = self._post_target(target)
         in_target = np.zeros_like(target)
         while not np.all(in_target):
@@ -111,12 +116,13 @@ class ExcavatorEnv(gym.Env):
             self.trajectory_idx = 0
             done = False
         elif restart_required:
-            print('Solver {0} should restart due to unexpected collision!'.format(self.env_id))
+            #print('Solver {0} should restart due to unexpected collision!'.format(self.env_id))
             done = False # True
         elif switch_target:
             self.target_idx += 1
             self.dig_target = x
             done = False
+            print('TARGET HAS CHANGED!')
         else:
             done = False
         self.last_state = state.copy()
@@ -285,7 +291,7 @@ class ExcavatorEnv(gym.Env):
 
     def _generate_demo_policy(self):
         target_reshaped = self.dig_target.reshape(1, self.action_dim)
-        self.demo_policy = self.model.predict(target_reshaped)[0]
+        self.demo_policy = moving_average(self.model.predict(target_reshaped)[0], 1, 2)
         if self.debug:
             print(self.demo_policy[:, 0] * (self.x_max[0] - self.x_min[0]) + self.x_min[0])
 
