@@ -33,6 +33,7 @@ def validate_and_plot(model, x0, y, w=4, h=4):
             pij = model.predict(p[i:i+1, j:j+1, :])
             print(i,j, pij)
             p[i, j + 1, :] = pij
+            model.reset_states()
     fig, axs = pp.subplots(w, h)
     fig.set_size_inches(18.5, 10.5)
     for i in range(w):
