@@ -9,6 +9,7 @@ def create_model(n_steps, n_features, n_nodes=256):
     # create train model
 
     model_tr = tf.keras.models.Sequential([tf.keras.Input(shape=(n_steps, n_features))])
+    model_tr.add(tf.keras.layers.Masking(mask_value=0., input_shape=(n_steps, n_features)))
     model_tr.add(tf.keras.layers.LSTM(n_nodes, activation='relu'))
     model_tr.add(tf.keras.layers.Dropout(0.5))
     model_tr.add(tf.keras.layers.Dense(n_features, activation='sigmoid'))
