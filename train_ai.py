@@ -109,7 +109,7 @@ if __name__ == '__main__':
     # create environments
 
     load_path = 'policies/human/checkpoints/last'
-    nsteps = 128
+    nsteps = 8
     nupdates = 1000
     env_fns = [create_env(key) for key in range(len(envs))]
     env = SubprocVecEnv(env_fns)

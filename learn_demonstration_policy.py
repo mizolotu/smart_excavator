@@ -6,6 +6,27 @@ from baselines.ppo2.model import Model
 from baselines.common.policies import build_policy
 from baselines.common.vec_env import SubprocVecEnv
 from train_ai import create_env
+from matplotlib import pyplot as pp
+
+def reduce_series(data, a_thr=5.0/360.0, dig_len_thr=5, dig_start_idx=2):
+    a_target_idx = 1
+    n = np.zeros(data.shape[0])
+    data_reduced = []
+    for i in range(n_series):
+        series = data[i*n_cycles:(i+1)*n_cycles, :]
+        target_angles = series[:, a_target_idx]
+        y = series[:, action_dim + other_dim:]
+        cycle_ok = 0
+        for j in range(n_cycles):
+            tr = y[j, :].reshape(series_len, action_dim)
+            a_target = target_angles[j]
+            idx = np.where((tr[:, 0] > a_target - a_thr) & (tr[:, 0] < a_target + a_thr))[0]
+            if len(idx) > dig_len_thr:
+                cycle_ok += 1
+        if cycle_ok == n_cycles:
+            data_reduced.append(series[:, dig_start_idx*action_dim:])
+    data_reduced = np.vstack(data_reduced)
+    return data_reduced
 
 if __name__ == '__main__':
 
@@ -32,6 +53,11 @@ if __name__ == '__main__':
     assert n_labels % action_dim == 0
     series_len = n_labels // action_dim
     n_features = 2 * action_dim + 1
+    data = reduce_series(data)
+    sample_len = data.shape[1]
+    n_labels = sample_len - action_dim - other_dim
+    n_samples = data.shape[0]
+    n_series = n_samples // n_cycles
 
     # reward coefficients
 
@@ -71,7 +97,7 @@ if __name__ == '__main__':
 
     nenvs = 2
     network = 'mlp'
-    nminibatches = 4
+    nminibatches = 2
     nsteps = 8
     ent_coef = 0.0
     vf_coef = 0.5
@@ -79,12 +105,12 @@ if __name__ == '__main__':
     mpi_rank_weight = 1
     env_fns = [create_env(key) for key in range(nenvs)]
     env = SubprocVecEnv(env_fns)
-    nbatch_train = nenvs * nsteps // nminibatches
+    nbatch_train = x.shape[0] # nenvs * nsteps // nminibatches
     policy = build_policy(env, network)
     model = Model(
         policy=policy,
         nbatch_act=nenvs,
-        nbatch_train=nbatch_train,
+        nbatch_train=None, #nbatch_train,
         nsteps=nsteps,
         ent_coef=ent_coef,
         vf_coef=vf_coef,
@@ -95,7 +121,7 @@ if __name__ == '__main__':
 
     # train model
 
-    lr = 1e-4
+    lr = 1e-3
     epochs = int(1e6)
     idx = np.arange(n_samples)
     losses = []
@@ -106,9 +132,11 @@ if __name__ == '__main__':
         loss = model.train_on_demo(lr, obs, action_means)
         losses.append(loss[0])
         if e % (epochs // 100) == 0 and e > 0:
-            print(obs)
             print('{0}% completed, loss: {1}'.format(e // (epochs // 100), np.mean(losses)))
             losses = []
+            actions, _, _, _ = model.step(obs[0, :])[0]
+            print(actions)
+            pp.plot(actions.reshape(120, 4))
 
     # save model
 

@@ -498,8 +498,6 @@ def callScript(deltaTime, simulationTime):
 
             # set input values
 
-            # print(GObject.data['in_target'])
-
             GObject.data['controls'] = controls
             cv = GObject.data['controls']
             cc = component_controls

@@ -32,7 +32,7 @@ class ExcavatorEnv(gym.Env):
 
         self.episode_count = 0
         self.step_count = 0
-        self.n_steps = 32
+        self.n_steps = 30
         self.n_series = 8
         self.step_count_max = self.n_series
         self.env_id = id
@@ -53,6 +53,7 @@ class ExcavatorEnv(gym.Env):
         self.x_max = np.array([180.0, 812.0058600513476, 1011.7128949856826, 787.6024456729566])
         self.m_max = 1000.0
         self.t_max = 60.0
+        self.delay_max = 3.0
 
         # observation and action spaces
 
@@ -62,11 +63,11 @@ class ExcavatorEnv(gym.Env):
         self.debug = True
 
     def step(self, action, x_ind=4, m_ind=-1, x_thr=5.0):
+        pp.plot(action.reshape(self.n_steps, self.action_dim))
+        pp.show()
         action = np.clip(action, self.action_space.low, self.action_space.high)
         action = (action - self.action_space.low) / (self.action_space.high - self.action_space.low)
         trajectory = action.reshape(self.n_steps, self.action_dim)
-        pp.plot(trajectory)
-        pp.show()
         self.mass = 0
         jdata = self._post_target()
         x_dig = (jdata['x'] - self.x_min) / (self.x_max - self.x_min)
@@ -92,13 +93,13 @@ class ExcavatorEnv(gym.Env):
                     for i in range(self.action_dim):
                         if dist_to_x[i] < x_thr:
                             in_target[i] = 1
-                if t_step_delta > self.t_max:
+                if t_step_delta > self.delay_max:
                     break
         t_cycle_delta = time() - t_cycle_start
         t_elapsed = t_cycle_delta / self.t_max
         state = self._construct_state(x_dig)
         self.step_count += 1
-        sleep(self.t_max)
+        sleep(self.delay_max)
         jdata = self._post_target()
         dumped = jdata['d'] / self.m_max
         reward = self._calculate_reward(x_dig, dumped, n_collisions, t_elapsed)
@@ -138,6 +139,7 @@ class ExcavatorEnv(gym.Env):
                     sleep(delay)
         state = self._construct_state(self.dig_target)
         self.step_count = 0
+        print(state)
         return state
 
     def render(self, mode='human', close=False):

@@ -1,5 +1,4 @@
 import tensorflow as tf
-import numpy as np
 import functools
 
 from baselines.common.tf_util import get_session, save_variables, load_variables
