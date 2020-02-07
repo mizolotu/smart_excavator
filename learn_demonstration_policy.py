@@ -2,7 +2,7 @@ import numpy as np
 import sys, os
 import os.path as osp
 
-from ppo2.model import Model
+from baselines.ppo2.model import Model
 from baselines.common.policies import build_policy
 from baselines.common.vec_env import SubprocVecEnv
 from train_ai import create_env
