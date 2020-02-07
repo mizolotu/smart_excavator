@@ -1,8 +1,10 @@
 import json, logging, os
+
 from excavator_env import ExcavatorEnv
 from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
 from baselines.ppo2.ppo2 import learn as learn_ppo
 from baselines.ddpg.ddpg import learn as learn_ddpg
+from baselines import logger
 from threading import Thread
 from flask import Flask, jsonify, request
 
@@ -84,9 +86,14 @@ def target():
 
 if __name__ == '__main__':
 
-    # comment the line below to enable CUDA
+    # disable cuda
 
+    os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
+    # configure logger
+
+    log_dir = 'policies/human+ppo'
+    logger.configure(log_dir)
 
     # target lists
 
@@ -101,11 +108,12 @@ if __name__ == '__main__':
 
     # create environments
 
+    load_path = 'policies/human/checkpoints/last'
     nsteps = 128
     nupdates = 1000
     env_fns = [create_env(key) for key in range(len(envs))]
     env = SubprocVecEnv(env_fns)
-    reset_th = Thread(target=learn_ppo, args=('mlp', env, len(envs) * nsteps * nupdates))
+    reset_th = Thread(target=learn_ppo, args=('mlp', env, len(envs) * nsteps * nupdates, load_path))
     reset_th.start()
 
     # start http server

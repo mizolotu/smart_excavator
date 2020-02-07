@@ -1,7 +1,8 @@
 import pickle, subprocess, logging, winreg, requests, json
 import numpy as np
-from threading import Thread
+import os.path as osp
 
+from threading import Thread
 from flask import Flask, jsonify, request
 from time import sleep, time
 
@@ -30,7 +31,7 @@ def retrieve_original_dataset(data_file='data/level_points.pkl', nsteps=32):
         data[-1].append(p)
     return data
 
-def augment_data(sample, a_min=75, a_max=115):
+def augment_data(sample, a_min=80, a_max=110):
     sample_aug = []
     dig_angle_orig = np.max([np.max(d[:, 0]) for d in sample])
     dig_angle_new = a_min + np.random.rand() * (a_max - a_min)
@@ -100,7 +101,7 @@ def target():
     global backend
     data = request.data.decode('utf-8')
     jdata = json.loads(data)
-    data_keys = ['x', 'l', 't', 'm', 'c']
+    data_keys = ['x', 'l', 't', 'm', 'd', 'c']
     if request.method == 'GET':
         for key in data_keys:
             backend[key] = jdata[key]
@@ -119,7 +120,7 @@ def target():
         data['running'] = backend['running']
         return jsonify(data)
 
-def generate_demonstration_dataset(fname, n_series=1000, mws = 'C:\\Users\\iotli\\PycharmProjects\\SmartExcavator\\mws\\env.mws', http_url='http://127.0.0.1:5000', mode_uri='mode', delay=1.0, a_thr=3.0, x_thr=5.0, t_thr=3.0, m_thr=50.0, m_max=1000):
+def generate_demonstration_dataset(fname, n_series=1000, mws = 'C:\\Users\\iotli\\PycharmProjects\\SmartExcavator\\mws\\env.mws', http_url='http://127.0.0.1:5000', mode_uri='mode', delay=1.0, x_thr=[3.0, 5.0, 5.0, 5.0], t_thr=3.0, m_thr=10.0, m_max=1000.0, t_max=60.0):
     regkey = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r'Software\WOW6432Node\Mevea\Mevea Simulation Software')
     (solverpath, _) = winreg.QueryValueEx(regkey, 'InstallPath')
     solverpath += r'\Bin\MeveaSolver.exe'
@@ -138,15 +139,22 @@ def generate_demonstration_dataset(fname, n_series=1000, mws = 'C:\\Users\\iotli
         requests.post('{0}/{1}'.format(http_url, mode_uri), json={'mode': 'AI_TRAIN'}).json()
         print('started')
         print(backend)
-        sample_orig = np.random.choice(data_orig)
+        idx = np.arange(len(data_orig))
+        sample_orig = data_orig[np.random.choice(idx)]
         dsa = augment_data(sample_orig)
+        dumped_last = 0
+
+        T = []
+        X = []
+        D = []
+        C = []
+        M = []
+
+        dig_target = None
         for ci,cycle in enumerate(dsa):
-            print(ci)
-            dig_angle = None
-            bucket_close_target_idx = None
-            dig_target = None
-            bucket_max = 0
+            cycle_time_start = time()
             mass = np.zeros(cycle.shape[0])
+            dig_angle = None
             for i in range(cycle.shape[0]):
                 target = cycle[i, :]
                 post_target(target)
@@ -155,39 +163,44 @@ def generate_demonstration_dataset(fname, n_series=1000, mws = 'C:\\Users\\iotli
                 if mass[i] > m_thr and dig_angle is None:
                     dig_target = backend['x']
                     dig_angle = backend['x'][0]
-                if dig_angle is not None and np.abs(backend['x'][0] - dig_angle) <= a_thr and backend['x'][3] > bucket_max:
-                    bucket_max = backend['x'][3]
-                    bucket_close_target_idx = i
+                if ci > 0 and i == cycle.shape[0] // 2:
+                    D.append((backend['d'] - dumped_last) / m_max)
+                    dumped_last = backend['d']
                 t_start = time()
                 while not np.all(in_target):
                     current = backend['x']
                     dist_to_x = np.abs(np.array(current) - target)
                     for i in range(4):
-                        if dist_to_x[i] < x_thr:
+                        if dist_to_x[i] < x_thr[i]:
                             in_target[i] = 1
                     if (time() - t_start) > t_thr:
                         break
-            if dig_target is not None:
-                print('Dig here: {0}'.format(dig_target))
-                t = (dig_target - x_min) / (x_max - x_min + 1e-10)
-                c = (cycle - np.ones((cycle.shape[0], 1)) * x_min) / (np.ones((cycle.shape[0], 1)) * (x_max - x_min + 1e-10))
-                v = c.reshape(4 * cycle.shape[0])
-                m = mass[bucket_close_target_idx] / m_max
-                x = np.hstack([t, m, v])
-                line = ','.join([str(item) for item in x])
-                with open(fname, 'a') as f:
-                    f.write(line + '\n')
+            T.append((time() - cycle_time_start) / t_max)
+            X.append((dig_target - x_min) / (x_max - x_min + 1e-10))
+            c = (cycle - np.ones((cycle.shape[0], 1)) * x_min) / (np.ones((cycle.shape[0], 1)) * (x_max - x_min + 1e-10))
+            C.append(c.reshape(4 * cycle.shape[0]))
+            M.append(np.max(mass) / m_max)
 
-                #for i in range(cycle.shape[0] - 2):
-                #    a = (cycle[i + 2,:] - x_min) / (x_max - x_min + 1e-10)
-                #    c = (cycle[i + 1,:] - x_min) / (x_max - x_min + 1e-10)
-                #    l = (cycle[i,:] - x_min) / (x_max - x_min + 1e-10)
-                #    m = mass[i] / m_max
-                #    print(dig_angle, bucket_close_target_idx, t, a, m)
-                #    x = np.hstack([t - l, t - c, m, a]).tolist()
-                #    line =','.join([str(item) for item in x])
-                #    with open(fname, 'a') as f:
-                #        f.write(line + '\n')
+        # for the last cycle we wait for few seconds to let the simulator to calculate the soil mass in the dumper
+
+        sleep(5.0)
+        D.append((backend['d'] - dumped_last) / m_max)
+
+        # save data to the file
+
+        for ci in range(n_cycles):
+            t = T[ci]
+            x = X[ci]
+            d = D[ci]
+            c = C[ci]
+            m = M[ci]
+            v = np.hstack([ci, x, t, m, d, c])
+            line = ','.join([str(item) for item in v])
+            with open(fname, 'a') as f:
+                f.write(line + '\n')
+            print(ci, t, x, m, d)
+
+        # stop the software
 
         requests.post('{0}/{1}'.format(http_url, mode_uri), json={'mode': 'RESTART'}).json()
         print('stopped')
@@ -213,18 +226,21 @@ if __name__ == '__main__':
     # file name to save dataset
 
     fname = 'data/policy_data.txt'
-    #open(fname, 'w').close()
+    if not osp.exists(fname):
+        open(fname, 'w').close()
 
     # original data
 
-    data_orig = retrieve_original_dataset()
+    n_cycles = 4
+    data_orig_all = retrieve_original_dataset()
+    data_orig = [series for series in data_orig_all if len(series) == n_cycles]
     x_min = np.array([-180.0, 3.9024162648733514, 13.252630737652677, 16.775050853637147])
     x_max = np.array([180.0, 812.0058600513476, 1011.7128949856826, 787.6024456729566])
     m_max = 1000
 
     # start solver
 
-    backend = {'ready': False, 'running': False, 'mode': 'AI_TRAIN', 'x': None, 'l': None, 't': None, 'y': None, 'm': None, 'c': None}
+    backend = {'ready': False, 'running': False, 'mode': 'AI_TRAIN', 'x': None, 'l': None, 't': None, 'y': None, 'm': None, 'd': None, 'c': None}
     th = Thread(target=generate_demonstration_dataset, args=(fname, n_series))
     th.setDaemon(True)
     th.start()

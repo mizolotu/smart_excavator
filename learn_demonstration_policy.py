@@ -1,65 +1,11 @@
-import tensorflow as tf
 import numpy as np
 import sys, os
+import os.path as osp
 
-from matplotlib import pyplot as pp
-
-def create_model(n_steps, n_features, n_nodes=256):
-
-    # create train model
-
-    model_tr = tf.keras.models.Sequential([tf.keras.Input(shape=(n_steps, n_features))])
-    model_tr.add(tf.keras.layers.Masking(mask_value=0., input_shape=(n_steps, n_features)))
-    model_tr.add(tf.keras.layers.LSTM(n_nodes, activation='relu'))
-    model_tr.add(tf.keras.layers.Dropout(0.0))
-    model_tr.add(tf.keras.layers.Dense(n_features, activation='sigmoid'))
-    model_tr.compile(optimizer='adam', loss='mse', metrics=['accuracy'])
-    print(model_tr.summary())
-
-    return model_tr
-
-def validate_and_plot(model, x0, y, w=4, h=4):
-    p = np.zeros((x0.shape[0] // n_steps, n_steps, y.shape[1]))
-    r = np.zeros((x0.shape[0] // n_steps, n_steps, y.shape[1]))
-    for i in range(x0.shape[0] // n_steps):
-        r[i, :, :] = y[i * n_steps : (i+1) * n_steps, :]
-        x_ = x0[i * n_steps, :, :]
-        for j in range(n_steps):
-            pij = model.predict(x_.reshape(1, n_steps, n_features))
-            p[i, j, :] = pij
-            x_ = np.vstack([x_[1:, :], pij])
-    fig, axs = pp.subplots(w, h)
-    fig.set_size_inches(18.5, 10.5)
-    for i in range(w):
-        for j in range(h):
-            idx = i * w + j
-            axs[i, j].plot(p[idx, :, :])
-            axs[i, j].plot(r[idx, :, :], '--')
-    fig.savefig(validation_fig, dpi=fig.dpi)
-    pp.close(fig)
-
-def create_traj_model(n_features, n_labels, n_layers=2, n_nodes=2048):
-    model = tf.keras.models.Sequential([tf.keras.Input(shape=(n_features,))])
-    for i in range(n_layers):
-        model.add(tf.keras.layers.Dense(n_nodes, activation='relu'))
-        model.add(tf.keras.layers.Dropout(0.5))
-    model.add(tf.keras.layers.Dense(n_labels, activation='sigmoid'))
-    model.add(tf.keras.layers.Reshape((n_labels // n_features, n_features)))
-    model.compile(optimizer='adam', loss='mse', metrics=['accuracy'])
-    print(model.summary())
-    return model
-
-def create_lstm_model(n_features, n_labels, series_len, n_layers = 2, n_nodes = 256):
-    model = tf.keras.models.Sequential()
-    model.add(tf.keras.layers.Masking(mask_value=0., input_shape=(series_len, n_features)))
-    for i in range(n_layers - 1):
-        model.add(tf.keras.layers.LSTM(n_nodes, activation='relu', return_sequences=True))
-        model.add(tf.keras.layers.Dropout(0.5))
-    model.add(tf.keras.layers.LSTM(n_nodes, activation='relu'))
-    model.add(tf.keras.layers.Dropout(0.5))
-    model.add(tf.keras.layers.Dense(n_labels, activation='sigmoid'))
-    model.compile(optimizer='adam', loss='mse', metrics=['accuracy'])
-    return model
+from ppo2.model import Model
+from baselines.common.policies import build_policy
+from baselines.common.vec_env import SubprocVecEnv
+from train_ai import create_env
 
 if __name__ == '__main__':
 
@@ -68,51 +14,105 @@ if __name__ == '__main__':
     if'cpu' in sys.argv[1:]:
         os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
-    #  get data
+    #  get data: 0 - index, 1,2,3,4 - target, 5 - time, 6 - mass, 7 - dumped, 8,... - cycle
 
     action_dim = 4
+    other_dim = 4
+    n_cycles = 4
+    time_idx = 5
+    mass_idx = 6
+    rew_idx = 7
     fname = 'data/policy_data.txt'
     data = np.loadtxt(fname, dtype=float, delimiter=',')
-    data = np.hstack([data[:, :action_dim], data[:, action_dim + 1:]])  # remove mass
     n_samples = data.shape[0]
+    assert n_samples % n_cycles == 0
+    n_series = n_samples // n_cycles
     sample_len = data.shape[1]
-    assert (sample_len - action_dim) % action_dim == 0
-    series_len = (sample_len - action_dim) // action_dim
-    n_features = action_dim
-    n_steps = (data.shape[1] - action_dim) // n_features - 1
+    n_labels = sample_len - action_dim - other_dim
+    assert n_labels % action_dim == 0
+    series_len = n_labels // action_dim
+    n_features = 2 * action_dim + 1
 
-    x = np.zeros((n_samples * n_steps, n_steps, n_features))
-    y = np.zeros((n_samples * n_steps, n_features))
-    for i in range(n_samples):
-        target_minus_traj = np.ones((n_steps + 1, 1)).dot(data[i:i+1, :n_features]) - data[i, n_features:].reshape(series_len, action_dim)
-        traj = data[i, n_features:].reshape(series_len, action_dim)
-        for j in range(n_steps):
-            x[i * n_steps + j, n_steps-j-1:n_steps, :] = target_minus_traj[:j+1, :]
-            y[i * n_steps + j, :] = traj[j+1, :]
-    print(x.shape, y.shape)
+    # reward coefficients
+
+    m_coeff = 0.5
+    d_coeff = 0.4
+    t_coeff = 0.1
+
+    # generate dataset
+
+    x = np.zeros((n_samples, n_features))
+    y = np.zeros((n_samples, n_labels))
+    r = np.zeros((n_samples, 1))
+    q = np.zeros((n_samples, 1))
+    for i in range(n_series):
+        v = 0
+        series = data[i*n_cycles:(i+1)*n_cycles, :]
+        dig_target = np.mean(series[:, 1:action_dim+1], axis=0)
+        m_max = 0
+        for j in range(n_cycles):
+            idx = i * n_cycles + j
+            x_dig = series[j, 1:action_dim+1]
+            dist_to_target = np.linalg.norm(x_dig - dig_target)
+            t_elapsed = series[j, time_idx]
+            m_dumped = series[j, rew_idx]
+            x[idx, :action_dim] = x_dig
+            x[idx, action_dim:action_dim+action_dim] = dig_target
+            x[idx, action_dim+action_dim] = m_max
+            m_max = series[j, mass_idx]
+            s = series[j, action_dim + other_dim:]
+            y[idx, :] = - np.ones_like(s) + 2 * s  # rescale to [-1, 1] interval
+            r[idx, 0] = m_coeff * m_dumped + t_coeff * (1 - t_elapsed) + d_coeff * (1 - dist_to_target)
+            v += r[idx, 0]
+            q[idx, 0] = v
+    print('X shape: {0}, Y shape: {1}'.format(x.shape, y.shape))
+
+    # create model
+
+    nenvs = 2
+    network = 'mlp'
+    nminibatches = 4
+    nsteps = 8
+    ent_coef = 0.0
+    vf_coef = 0.5
+    max_grad_norm = 0.5
+    mpi_rank_weight = 1
+    env_fns = [create_env(key) for key in range(nenvs)]
+    env = SubprocVecEnv(env_fns)
+    nbatch_train = nenvs * nsteps // nminibatches
+    policy = build_policy(env, network)
+    model = Model(
+        policy=policy,
+        nbatch_act=nenvs,
+        nbatch_train=nbatch_train,
+        nsteps=nsteps,
+        ent_coef=ent_coef,
+        vf_coef=vf_coef,
+        max_grad_norm=max_grad_norm,
+        comm=None,
+        mpi_rank_weight=mpi_rank_weight
+    )
 
     # train model
 
-    n_validation = 16
-    epochs = 10000
-    batch_size = 31
-    checkpoint_prefix = "policies/demonstration/last.ckpt"
-    validation_fig = "policies/demonstration/validation.png"
+    lr = 1e-4
+    epochs = int(1e6)
+    idx = np.arange(n_samples)
+    losses = []
+    for e in range(epochs):
+        np.random.shuffle(idx)
+        obs = x[idx[:nbatch_train], :]
+        action_means = y[idx[:nbatch_train], :]
+        loss = model.train_on_demo(lr, obs, action_means)
+        losses.append(loss[0])
+        if e % (epochs // 100) == 0 and e > 0:
+            print(obs)
+            print('{0}% completed, loss: {1}'.format(e // (epochs // 100), np.mean(losses)))
+            losses = []
 
-    x_train = x[n_validation * n_steps:, :, :]
-    y_train = y[n_validation * n_steps:, :]
-    x_val = x[:n_validation * n_steps, :, :]
-    y_val = y[:n_validation* n_steps, :]
-    model = create_model(n_steps, n_features)
-    try:
-        model.load_weights(checkpoint_prefix)
-    except Exception as e:
-        print(e)
-        for epoch in range(epochs):
-            h = model.fit(x_train, y_train, verbose=False, batch_size=batch_size)
-            if epoch % (epochs // 100) == 0:
-                print(epoch, h.history)
-                validate_and_plot(model, x_val, y_val)
-        model.save_weights(checkpoint_prefix)
+    # save model
 
-    validate_and_plot(model, x_val[:, 0, :], y_val)
+    checkdir = 'policies/human/checkpoints'
+    savepath = osp.join(checkdir, 'last')
+    print('Saving hOOman policy to {0}'.format(savepath))
+    model.save(savepath)

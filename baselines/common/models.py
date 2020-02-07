@@ -233,7 +233,7 @@ def cnn_small(**conv_kwargs):
     return network_fn
 
 @register("lstm")
-def lstm(nlstm=128, layer_norm=False):
+def lstm(nlstm=64, layer_norm=False):
     """
     Builds LSTM (Long-Short Term Memory) network to be used in a policy.
     Note that the resulting function returns not only the output of the LSTM

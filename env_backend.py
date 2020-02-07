@@ -19,7 +19,8 @@ data_names = {
         'Cylinder_Bucket x'
     ],
     'scores': [
-        'massSensorBucketTeeth Mass'
+        'massSensorBucketTeeth Mass',
+        'soilTransferSensor MassTot'
     ],
     'collisions': [
         'Ground nminor',
@@ -113,9 +114,9 @@ def get_mode(id):
         mode = None
     return mode
 
-def get_target(id, point, last_point, time_passed, ground_mass, collisions=0):
+def get_target(id, point, last_point, time_passed, soil_mass, dumped_mass, collisions=0):
     uri = '{0}/{1}'.format(http_url, target_uri)
-    jdata = {'id': id, 'x': point, 'l': last_point, 't': time_passed, 'm': ground_mass, 'c': collisions}
+    jdata = {'id': id, 'x': point, 'l': last_point, 't': time_passed, 'm': soil_mass, 'd': dumped_mass, 'c': collisions}
     try:
         r = requests.get(uri, json=jdata)
         jdata = r.json()
@@ -226,7 +227,7 @@ def callScript(deltaTime, simulationTime):
 
             # calculate velocity and request target
 
-            target, _ = get_target(GObject.data['id'], GObject.data['current_position'], GObject.data['previous_position'], GObject.data['time_passed'], score_values[0], np.sum(collision_values))
+            target, _ = get_target(GObject.data['id'], GObject.data['current_position'], GObject.data['previous_position'], GObject.data['time_passed'], score_values[0], score_values[1], np.sum(collision_values))
 
             # in case of success
 
@@ -257,7 +258,7 @@ def callScript(deltaTime, simulationTime):
 
                 # check whether target or mode have changed
 
-                target, mode = get_target(GObject.data['id'], GObject.data['current_position'], GObject.data['previous_position'], GObject.data['time_passed'], score_values[0], np.sum(collision_values))
+                target, mode = get_target(GObject.data['id'], GObject.data['current_position'], GObject.data['previous_position'], GObject.data['time_passed'], score_values[0], score_values[1], np.sum(collision_values))
 
                 # process mode
 

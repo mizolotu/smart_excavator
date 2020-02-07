@@ -17,7 +17,7 @@ def constfn(val):
         return val
     return f
 
-def learn(network, env, total_timesteps,
+def learn(network, env, total_timesteps, load_path,
     eval_env=None,
     seed=None,
     nsteps=128,
@@ -32,7 +32,6 @@ def learn(network, env, total_timesteps,
     noptepochs=4,
     cliprange=0.2,
     save_interval=10,
-    load_path=None,
     model_fn=None,
     update_fn=None,
     init_fn=None,
@@ -93,7 +92,6 @@ def learn(network, env, total_timesteps,
     '''
 
     set_global_seeds(seed)
-
     if isinstance(lr, float): lr = constfn(lr)
     else: assert callable(lr)
     if isinstance(cliprange, float): cliprange = constfn(cliprange)
@@ -119,12 +117,28 @@ def learn(network, env, total_timesteps,
         from baselines.ppo2.model import Model
         model_fn = Model
 
-    model = model_fn(policy=policy, ob_space=ob_space, ac_space=ac_space, nbatch_act=nenvs, nbatch_train=nbatch_train,
-                    nsteps=nsteps, ent_coef=ent_coef, vf_coef=vf_coef,
-                    max_grad_norm=max_grad_norm, comm=comm, mpi_rank_weight=mpi_rank_weight)
+    model = model_fn(
+        policy=policy,
+        nbatch_act=nenvs,
+        nbatch_train=nbatch_train,
+        nsteps=nsteps,
+        ent_coef=ent_coef,
+        vf_coef=vf_coef,
+        max_grad_norm=max_grad_norm,
+        comm=comm,
+        mpi_rank_weight=mpi_rank_weight
+    )
 
     if load_path is not None:
         model.load(load_path)
+        print('Model has been successfully loaded from {0}'.format(load_path))
+    else:
+        try:
+            lp = osp.join(logger.get_dir(), 'checkpoints/last')
+            model.load(lp)
+            print('Model has been successfully loaded from {0}'.format(lp))
+        except Exception as e:
+            print(e)
 
     # Instantiate the runner object
     runner = Runner(env=env, model=model, nsteps=nsteps, gamma=gamma, lam=lam)
@@ -226,16 +240,17 @@ def learn(network, env, total_timesteps,
             logger.logkv('misc/time_elapsed', tnow - tfirststart)
             for (lossval, lossname) in zip(lossvals, model.loss_names):
                 logger.logkv('misc/' + lossname, lossval)
-
             logger.dumpkvs()
+
         if save_interval and (update % save_interval == 0 or update == 1) and logger.get_dir() and is_mpi_root:
             checkdir = osp.join(logger.get_dir(), 'checkpoints')
             os.makedirs(checkdir, exist_ok=True)
             savepath = osp.join(checkdir, 'last')
             print('Saving to', savepath)
             model.save(savepath)
+
     model.sess.close()
     return model
-# Avoid division error when calculate the mean (in our case if epinfo is empty returns np.nan, not return an error)
+
 def safemean(xs):
     return np.nan if len(xs) == 0 else np.mean(xs)

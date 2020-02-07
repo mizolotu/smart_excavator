@@ -1,9 +1,8 @@
 import winreg, subprocess, gym, requests
 import numpy as np
 
-from misc import moving_average
 from time import sleep, time
-from learn_demonstration_policy import create_model
+from matplotlib import pyplot as pp
 
 class ExcavatorEnv(gym.Env):
 
@@ -11,7 +10,7 @@ class ExcavatorEnv(gym.Env):
 
     def __init__(self, id,
         mws='C:\\Users\\iotli\\PycharmProjects\\SmartExcavator\\mws\\env.mws',
-        obs_dim=13,
+        obs_dim=9,
         action_dim=4,
         http_url='http://127.0.0.1:5000',
         discrete_action=None,
@@ -33,102 +32,87 @@ class ExcavatorEnv(gym.Env):
 
         self.episode_count = 0
         self.step_count = 0
-        self.trajectory_idx = 0
         self.n_steps = 32
-        self.n_series = 4
-        self.step_count_max = self.n_series * self.n_steps
+        self.n_series = 8
+        self.step_count_max = self.n_series
         self.env_id = id
         self.backend_assigned = False
         self.dig_target = None
         self.emp_target = None
-        self.target_idx = 0
         self.http_url = http_url
 
         # state, action and reward coefficients
 
-        self.demo_policy = np.zeros((self.n_steps, self.action_dim))
-        self.stick_to_demonstration_policy = 1.0
-        self.improvisation = 0.0
-        self.time_coeff = 0.5
-        self.dist_coeff = 0.5
-        self.mass_coeff = 1.0
+        self.mass = 0
+        self.time_coeff = 0.1
+        self.dist_coeff = 0.4
+        self.mass_coeff = 0.5
         self.collision_coeff = 0.0
-        self.dist_thr = 0.01
         self.mass_thr = 0.05
-        self.collision_thr = 0
         self.x_min = np.array([-180.0, 3.9024162648733514, 13.252630737652677, 16.775050853637147])
         self.x_max = np.array([180.0, 812.0058600513476, 1011.7128949856826, 787.6024456729566])
-        self.m_max = 1000
-        self.t_max = 3.0
-        self.last_state = np.zeros(obs_dim - action_dim)
-        self.last_demo_action = np.zeros(action_dim)
-
-        # demonstration policy
-
-        self.model = self._load_demo_policy()
+        self.m_max = 1000.0
+        self.t_max = 60.0
 
         # observation and action spaces
 
         self.observation_space = gym.spaces.Box(low=0, high=1, shape=(obs_dim,), dtype=np.float)
         self.discrete_action = discrete_action
-        if self.discrete_action is None:
-            self.action_space = gym.spaces.Box(low=-1, high=1, shape=(action_dim,), dtype=np.float)
-        else:
-            self.action_space = gym.spaces.Discrete(self.discrete_action * action_dim)
-
-        self.debug = False
+        self.action_space = gym.spaces.Box(low=-1, high=1, shape=(action_dim * self.n_steps,), dtype=np.float)
+        self.debug = True
 
     def step(self, action, x_ind=4, m_ind=-1, x_thr=5.0):
         action = np.clip(action, self.action_space.low, self.action_space.high)
-        real_action = self.stick_to_demonstration_policy * self.last_demo_action + self.improvisation * action
-        target = np.clip(self.x_min + (self.x_max - self.x_min) * real_action, self.x_min, self.x_max)
-        #print(self.last_demo_action, action, real_action, target)
-
-        jdata = self._post_target(target)
-        in_target = np.zeros_like(target)
-        while not np.all(in_target):
-            t_delta = time() - self.last_step_time
-            if jdata is not None:
-                current = jdata['x']
-                dist_to_x = np.abs(np.array(current) - target)
-                for i in range(self.action_dim):
-                    if dist_to_x[i] < x_thr:
-                        in_target[i] = 1
-            if t_delta > self.t_max:
-                break
-            jdata = self._post_target()
-        state = self._construct_state(jdata)
-        demo_action = self.demo_policy[self.trajectory_idx, :]
-        self.trajectory_idx += 1
-        x = state[:x_ind]
-        m = state[m_ind]
-        c = jdata['c']
+        action = (action - self.action_space.low) / (self.action_space.high - self.action_space.low)
+        trajectory = action.reshape(self.n_steps, self.action_dim)
+        pp.plot(trajectory)
+        pp.show()
+        self.mass = 0
+        jdata = self._post_target()
+        x_dig = (jdata['x'] - self.x_min) / (self.x_max - self.x_min)
+        n_collisions = 0
+        t_cycle_start = time()
+        for i in range(trajectory.shape[0]):
+            target = np.clip(self.x_min + (self.x_max - self.x_min) * trajectory[i, :], self.x_min, self.x_max)
+            print(target)
+            jdata = self._post_target(target)
+            n_collisions += jdata['c']
+            mass = jdata['m'] / self.m_max
+            if mass > self.mass_thr and x_dig is None:
+                x_dig = (jdata['x'] - self.x_min) / (self.x_max - self.x_min)
+            if mass > self.mass:
+                self.mass = mass
+            in_target = np.zeros_like(target)
+            t_step_start = time()
+            while not np.all(in_target):
+                t_step_delta = time() - t_step_start
+                if jdata is not None:
+                    current = jdata['x']
+                    dist_to_x = np.abs(np.array(current) - target)
+                    for i in range(self.action_dim):
+                        if dist_to_x[i] < x_thr:
+                            in_target[i] = 1
+                if t_step_delta > self.t_max:
+                    break
+        t_cycle_delta = time() - t_cycle_start
+        t_elapsed = t_cycle_delta / self.t_max
+        state = self._construct_state(x_dig)
         self.step_count += 1
-        reward, switch_target, restart_required = self._calculate_reward(x, m, c, t_delta)
+        sleep(self.t_max)
+        jdata = self._post_target()
+        dumped = jdata['d'] / self.m_max
+        reward = self._calculate_reward(x_dig, dumped, n_collisions, t_elapsed)
         if self.debug:
-            print(self.step_count, self.trajectory_idx, real_action, reward, switch_target, self.dig_target)
+            print(self.step_count, state, reward, self.dig_target)
         if self.step_count == self.step_count_max:
             print('Solver {0} will restart as it has reached maximum step count.'.format(self.env_id))
             done = True
-        elif self.trajectory_idx == self.n_steps:
-            self._generate_demo_policy()
-            self.target_idx = 0
-            self.trajectory_idx = 0
-            done = False
-        elif restart_required:
+        elif n_collisions > 0:
             #print('Solver {0} should restart due to unexpected collision!'.format(self.env_id))
             done = False # True
-        elif switch_target:
-            self.target_idx += 1
-            self.dig_target = x
-            done = False
-            print('TARGET HAS CHANGED!')
         else:
             done = False
-        self.last_state = state.copy()
-        self.last_demo_action = demo_action.copy()
-        self.last_step_time = time()
-        return np.hstack([state, self.dig_target - demo_action]), reward, done, {'r': reward, 'l': self.step_count}
+        return state, reward, done, {'r': reward, 'l': self.step_count}
 
     def reset(self, delay=1.0, x_ind=4):
 
@@ -152,29 +136,12 @@ class ExcavatorEnv(gym.Env):
                     ready = True
                 else:
                     sleep(delay)
-        state = self._construct_state(jdata)
-
-        # action from demonstration
-
-        self._generate_demo_policy()
-        self.trajectory_idx = 0
-        demo_action = self.demo_policy[self.trajectory_idx, :]
-
-        # remember some parameteres
-
-        self.last_step_time = time()
+        state = self._construct_state(self.dig_target)
         self.step_count = 0
-        self.last_state = state.copy()
-        self.last_demo_action = demo_action.copy()
-        return np.hstack([state, self.dig_target - demo_action])
+        return state
 
     def render(self, mode='human', close=False):
         pass
-
-    def _load_demo_policy(self, checkpoint_path='policies/demonstration/last.ckpt'):
-        model = create_model(self.action_dim, self.action_dim * self.n_steps)
-        model.load_weights(checkpoint_path)
-        return model
 
     def _get_mode(self, new_mode=None, uri='mode'):
         url = '{0}/{1}'.format(self.http_url, uri)
@@ -237,25 +204,6 @@ class ExcavatorEnv(gym.Env):
         self.dig_target = (np.array(target_list[0]) - self.x_min) / (self.x_max - self.x_min + eps)
         self.emp_target = (np.array(target_list[1]) - self.x_min) / (self.x_max - self.x_min + eps)
 
-    def _action_target(self, action):
-        if self.discrete_action is None:
-            action = np.array(action)
-            action_std = (action - self.action_space.low) / (self.action_space.high - self.action_space.low)
-            action_state_deltas = np.abs(action_std - self.last_x)
-            action_delays = action_state_deltas * self.t_max
-            action_coeff = action_delays / np.max(action_delays)
-            #action_target_idx = action_state_deltas.argmax()
-            #action_none = np.array([np.nan for _ in action])
-            #action_none[action_target_idx] = action_std[action_target_idx]
-            target = np.hstack([self.x_min + action_std * (self.x_max - self.x_min), action_coeff])
-        else:
-            action_target_idx = action // self.discrete_action
-            action_target_amp = (action % self.discrete_action) / (self.discrete_action - 1)
-            action_std = np.array([np.nan for _ in range(self.action_space.n // self.discrete_action)])
-            action_std[action_target_idx] = action_target_amp
-            target = self.x_min + action_std * (self.x_max - self.x_min)
-        return target
-
     def _post_target(self, target=None, uri='p_target'):
         url = '{0}/{1}'.format(self.http_url, uri)
         if target is not None:
@@ -268,52 +216,13 @@ class ExcavatorEnv(gym.Env):
             jdata = None
         return jdata
 
-    def _calculate_delay(self, x, y, default_delay=0.1, eps=1e-10):
-        delay = default_delay
-        if x is not None:
-            delta = y - x
-            idx = np.ones(len(x))
-            idx[np.isnan(delta)] = 0
-            idx_ = idx.argmax()
-            delay = self.t_max[idx_] * np.abs(delta[idx_]) / (self.x_max[idx_] - self.x_min[idx_] + eps)
-        return delay
-
-    def _construct_state(self, jdata, eps=1e-10):
-        x = np.array(jdata['x'])
-        l = np.array(jdata['l'])
-        m = jdata['m']
-        x_std = (x - self.x_min) / (self.x_max - self.x_min + eps)
-        l_std = (l - self.x_min) / (self.x_max - self.x_min + eps)
+    def _construct_state(self, x_dig, eps=1e-10):
         t_std = self.dig_target
-        m_std = m / (self.m_max + eps)
-        state = np.hstack([t_std - x_std, t_std - l_std, m_std])
+        m_std = self.mass / (self.m_max + eps)
+        state = np.hstack([x_dig, t_std, m_std])
         return state
 
-    def _generate_demo_policy(self):
-        target_reshaped = self.dig_target.reshape(1, self.action_dim)
-        self.demo_policy = moving_average(self.model.predict(target_reshaped)[0], 1, 2)
-        if self.debug:
-            print(self.demo_policy[:, 0] * (self.x_max[0] - self.x_min[0]) + self.x_min[0])
-
-    def _calculate_reward(self, x, m, c, t):
-        switch_target = False
-        restart_required = False
-        if self.target_idx == 0:
-            dist_to_target = np.linalg.norm(x - self.dig_target)
-        else:
-            dist_to_target = np.linalg.norm(x - self.emp_target)
-        if self.debug:
-            print(self.target_idx, dist_to_target)
-        time_elapsed = t / self.t_max
-        r = self.dist_coeff * (1 - dist_to_target) + self.time_coeff * (1 - time_elapsed)  - self.collision_coeff * c
-        if self.target_idx == 0:
-            if dist_to_target <= self.dist_thr:
-                if m > self.mass_thr:
-                    switch_target = True
-        elif dist_to_target > self.dist_thr:
-            r += self.mass_coeff * m
-        else:
-            r -= self.mass_coeff * m
-        if c > self.collision_thr:
-            restart_required = True
-        return r, switch_target, restart_required
+    def _calculate_reward(self, x_dig, m_dumped, n_collisions, t_elapsed):
+        dist_to_target = np.linalg.norm(x_dig - self.dig_target)
+        r = self.dist_coeff * (1 - dist_to_target) + self.time_coeff * (1 - t_elapsed) + self.mass_coeff * m_dumped - self.collision_coeff * n_collisions
+        return r
