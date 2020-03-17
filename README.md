@@ -22,7 +22,7 @@ pip install -r requirements.txt
 
 4. In terminal, navigate to the Mevea Software resources directory (default: C:\Program Files (x86)\Mevea\Resources\Python\Bin) and install numpy and requests:
 ```bash
-python -m pip install numpy requests".
+python -m pip install numpy requests
 ```
 
 ## Demo
@@ -39,7 +39,7 @@ python excavator_demo.py --help
 
 ## Continue training
 
-Residual policy has been learned for 4-5 days, while PPO - only for a couple og hours. To continue training, substitute policy_name with either "residual" or "ppo" (default: residual) and specify number of environments (default: 2), for example:
+Residual policy has been learned for 4-5 days, while PPO - only for a couple of hours. To continue training, substitute policy_name with either "residual" or "ppo" (default: residual) and specify number of environments (default: 2), for example:
 ```bash
 python excavator_demo.py -m path_to_the_excavator_mvs -t train -p residual -n 2
 ```
