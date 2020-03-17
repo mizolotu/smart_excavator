@@ -59,6 +59,6 @@ python select_demonstration.py path_to_excavator_mvs
 
 1. Excavator may get stuck if the slew angle is about 135 degrees, becasue of the collison betweeen the bucket and the corner of the excavator platform.
 2. Excavator always rotates in the same direction that has been specified during the user's input, because it cannot read minds.  
-3. Spawing several instances of the solver during the training not only slows down the training, but also may negatively affect the policy learned, if the speed loss is significant. We recommend run a single itraining iteration using only one solver, then restart with two solvers and compare the time spent in both of those cases. If the increase is not significant, increment the number of environments, and so on.   
+3. Spawing several instances of the solver during the training not only slows down the training, but may also negatively affect the policy learned, if the speed loss is significant. We recommend run a single itraining iteration using only one solver, then restart with two solvers and compare the time spent in both of those cases. If the increase is not significant, increment the number of environments, and so on.   
 4. Running excavator_demo.py results in file progress.csv being overwritten. For this reason, executing plot_progress.py only makes sense immediately after (or during) the training.
 5. Communication between excavator gym environment specified in excavator_env.py and env_backend.py running by the solver instance is carried out via http (flask), which is probably overkill.
