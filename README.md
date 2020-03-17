@@ -18,7 +18,7 @@ git clone https://github.com/mizolotu/SmartExcavator
 python -m pip install -r requirements.txt
 ```
 
-3. Open Mevea Modeller and load Excavator Model. Go to Scripting -> Scripts, create a new script object, select "env_backend.py" from "SmartExcavator" directory as the file name in the object view. Go to I/O -> Inputs -> Input_Slew and select the object just created as the script name. 
+3. Open Mevea Modeller and load Excavator Model. Go to Scripting -> Scripts, create a new script object, select "env_backend.py" from "SmartExcavator" directory as the file name in the object view. Go to I/O -> Inputs -> Input_Slew (or any other input component) and select the object just created as the script name. 
 
 4. In terminal, navigate to the Mevea Software resources directory (default: C:\Program Files (x86)\Mevea\Resources\Python\Bin) and install numpy and requests:
 ```bash
