@@ -36,7 +36,7 @@ Once the solver has started, use joysticks or keyboard to grab some soil with th
 
 ## Continue training
 
-Residual policy has been learned for 4-5 days, while pure - only for several hours so far. To continue training, substitute policy_name with either "residual" or "pure" (default: residual) and specify number of environments (default: 2), for example:
+Residual policy has been learned for 4-5 days, while pure - only for several hours so far. To continue training, substitute "policy_name" with either "residual" or "pure" (default: residual) and specify number of environments (default: 2), for example:
 ```bash
 python excavator_demo.py -m path_to_the_excavator_mvs -t train -p residual -n 2
 ```
@@ -62,5 +62,5 @@ These trajectories are the ones used by the agent to learn its policy, not the o
 1. Excavator may get stuck if the slew angle is about 135 degrees, becasue of the collison betweeen the bucket and the corner of the excavator platform.
 2. Excavator always rotates in the same direction that has been specified during the user's input, because it cannot read minds.  
 3. Spawing several instances of the solver during the training not only slows down the training, but may also negatively affect the policy learned, if the speed loss is significant. We recommend to run a single training iteration using only one solver, then restart with two solvers and compare the time spent in both of those cases. If the increase of the iteration duration is not significant, you can try to increment the number of environments.   
-4. Running excavator_demo.py results in file progress.csv being overwritten. For this reason, executing plot_progress.py only makes sense immediately after (or during) the training.
-5. Communication between excavator gym environment specified in excavator_env.py and env_backend.py running by the solver instance is carried out via http (flask), which is probably overkill.
+4. Running "excavator_demo.py" results in file "progress.csv" being overwritten. For this reason, executing "plot_progress.py" only makes sense immediately after (or during) the training.
+5. Communication between excavator gym environment specified in "excavator_env.py" and "env_backend.py" running by the solver instance is carried out via http (flask), which is probably overkill.
