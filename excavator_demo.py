@@ -102,7 +102,7 @@ if __name__ == '__main__':
     # process arguments
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-m', '--model', help='File path of the excavator model.', required=True)
+    parser.add_argument('-m', '--model', help='File path to the excavator model.', required=True)
     parser.add_argument('-t', '--task', default='test', help='Task: train or test.', choices=['train', 'test'])
     parser.add_argument('-p', '--policy', default='residual', help='Policy: ppo or residual.', choices=['ppo', 'residual'])
     parser.add_argument('-n', '--nenvs', type=int, default=2, help='Number of environments for training.')

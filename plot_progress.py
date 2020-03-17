@@ -1,12 +1,15 @@
-import pandas
+import pandas, sys
 
 from matplotlib import pyplot as pp
-from scipy.signal import savgol_filter
-
 
 if __name__ == '__main__':
 
-    fpath = 'policies/human+ppo/progress.csv'
+    if len(sys.argv) == 2:
+        policy = sys.argv[1]
+    else:
+        print('Specify policy folder.')
+        sys.exit(1)
+    fpath = 'policies/{0}/progress.csv'.format(policy)
     p = pandas.read_csv(fpath, delimiter=',')
     keys = p.keys()
     upd_idx = [i for i,key in enumerate(keys) if 'nupdates' in key][0]
@@ -16,6 +19,7 @@ if __name__ == '__main__':
     exp_var_idx = [i for i, key in enumerate(keys) if 'explained_variance' in key][0]
     vals = p.values
 
-    pp.plot(vals[:, upd_idx], vals[:, rew_idx])
+    pp.plot(vals[:, upd_idx], vals[:, rew_idx], 'b')
+    pp.errorbar(vals[:, upd_idx], vals[:, rew_idx], [vals[:, rew_idx] - vals[:, min_rew_idx], vals[:, max_rew_idx] - vals[:, rew_idx]] , 'r')
     pp.show()
 

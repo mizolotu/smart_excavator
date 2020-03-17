@@ -1,11 +1,10 @@
-import subprocess, logging, winreg, requests, json, pandas, os
+import subprocess, logging, winreg, requests, json, pandas, os, sys
 import numpy as np
 import os.path as osp
 
 from threading import Thread
 from flask import Flask, jsonify, request
 from time import sleep, time
-from matplotlib import pyplot as pp
 
 app = Flask(__name__)
 log = logging.getLogger('werkzeug')
@@ -312,9 +311,13 @@ def post_target(target=None, http_url='http://127.0.0.1:5000', uri='p_target'):
 
 if __name__ == '__main__':
 
-    # number of time series (number of solver restarts)
+    # process args
 
-    n_series = 100
+    if len(sys.argv) == 2:
+        mvs = sys.argv[1]
+    else:
+        print('Please specify path to the excavator model!')
+        sys.exit(1)
 
     # file name to save dataset
 
@@ -336,7 +339,7 @@ if __name__ == '__main__':
     # start solver
 
     backend = {'ready': False, 'running': False, 'mode': 'AI_TRAIN', 'x': None, 'l': None, 't': None, 'y': None, 'm': None, 'd': None, 'c': None}
-    th = Thread(target=generate_demonstration_dataset, args=(fname, n_series))
+    th = Thread(target=generate_demonstration_dataset, args=(fname, mvs))
     th.setDaemon(True)
     th.start()
 
