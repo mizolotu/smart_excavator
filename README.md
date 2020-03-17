@@ -39,9 +39,9 @@ python excavator_demo.py --help
 
 ## Continue training
 
-Residual policy has been learned for 4-5 days, while PPO - only for a couple og hours. To continue training, substitute policy_name with either "residual" or "ppo" (default: residual) and specify number of environments (default: 2):
+Residual policy has been learned for 4-5 days, while PPO - only for a couple og hours. To continue training, substitute policy_name with either "residual" or "ppo" (default: residual) and specify number of environments (default: 2), for example:
 ```bash
-python excavator_demo.py -m path_to_the_excavator_mvs -t train -p policy_name -n number_of_solver_instances
+python excavator_demo.py -m path_to_the_excavator_mvs -t train -p residual -n 2
 ```
 
 
