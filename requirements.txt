@@ -58,11 +58,8 @@ scikit-learn==0.21.3
 scipy==1.4.1
 six==1.13.0
 sklearn==0.0
-tensorboard==1.14.0
-tensorflow==1.14.0
 tensorflow-auto-detect==1.11.0
-tensorflow-estimator==1.14.0
-tensorflow-gpu==1.14.0
+tensorflow>=1.15.0,<2.0
 termcolor==1.1.0
 tqdm==4.38.0
 urllib3==1.25.7

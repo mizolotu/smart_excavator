@@ -9,6 +9,7 @@ if __name__ == '__main__':
     else:
         print('Specify policy folder.')
         sys.exit(1)
+
     fpath = 'policies/{0}/progress.csv'.format(policy)
     p = pandas.read_csv(fpath, delimiter=',')
     keys = p.keys()
@@ -20,6 +21,6 @@ if __name__ == '__main__':
     vals = p.values
 
     pp.plot(vals[:, upd_idx], vals[:, rew_idx], 'b')
-    pp.errorbar(vals[:, upd_idx], vals[:, rew_idx], [vals[:, rew_idx] - vals[:, min_rew_idx], vals[:, max_rew_idx] - vals[:, rew_idx]] , 'r')
+    pp.errorbar(vals[:, upd_idx], vals[:, rew_idx], [vals[:, rew_idx] - vals[:, min_rew_idx], vals[:, max_rew_idx] - vals[:, rew_idx]], fmt='ok', color='blue', ecolor='blue', lw=3)
     pp.show()
 

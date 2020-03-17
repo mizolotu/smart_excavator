@@ -108,7 +108,7 @@ if __name__ == '__main__':
     parser.add_argument('-n', '--nenvs', type=int, default=2, help='Number of environments for training.')
     args = parser.parse_args()
 
-    # disable cuda
+    # disable cuda if tensorflow-gpu is used
 
     os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
