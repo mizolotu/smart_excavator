@@ -55,7 +55,7 @@ select_demonstration.py - simulates the excavator inputs using the demonstration
 python select_demonstration.py path_to_excavator_mvs
 ```
 
-These trajectories are the ones used by the agent to learn its policy, not the ones that the user inputs during the inference stage. This can be easily modified in such a way that the trajectories are built based on the user's input, but it does not make much sense, because an unexperienced user would certainly like to use the demonstration data recorded by a professional operator, instead of his/her own. 
+These trajectories are the ones used by the agent to learn its policy, not the ones that the user inputs during the inference stage. This can be easily modified in such a way that the trajectories are built based on the user's input, but would not make much sense, because an unexperienced user would certainly like to use the demonstration data recorded by a professional operator, instead of his/her own. 
 
 ## Known issues
 
