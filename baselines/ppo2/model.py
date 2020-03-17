@@ -40,11 +40,11 @@ class Model(object):
             # CREATE OUR TWO MODELS
             # act_model that is used for sampling
 
-            print('act model')
+            print('\nCreating act model:\n')
             act_model = policy(nbatch_act, 1, sess)
 
             # Train model for training
-            print('train model')
+            print('\nCreating train model:\n')
             if microbatch_size is None:
                 train_model = policy(nbatch_train, nsteps, sess)
             else:
@@ -110,7 +110,7 @@ class Model(object):
 
         # Total loss
 
-        self.demo_loss = tf.reduce_mean(tf.square(self.A - train_model.pi))
+        self.demo_loss = tf.reduce_mean(tf.square(self.A - train_model.pd.sample())) - entropy * ent_coef
         loss = pg_loss - entropy * ent_coef + vf_loss * vf_coef
 
         # UPDATE THE PARAMETERS USING LOSS
@@ -147,7 +147,7 @@ class Model(object):
         self.train_model = train_model
         self.act_model = act_model
         self.step = act_model.step
-        self.eval_step = act_model.step
+        self.eval_step = act_model.eval_step
         self.value = act_model.value
         self.initial_state = act_model.initial_state
 
@@ -158,14 +158,6 @@ class Model(object):
         global_variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="")
         if MPI is not None:
             sync_from_root(sess, global_variables, comm=comm) #pylint: disable=E1101
-
-    def train_on_demo(self, lr, obs, actions):
-        td_map = {
-            self.train_model.X: obs,
-            self.A: actions,
-            self.LR: lr
-        }
-        return self.sess.run([self.demo_loss, self._demo_train_op], td_map)[:-1]
 
     def train(self, lr, cliprange, obs, returns, masks, actions, values, neglogpacs, states=None):
 

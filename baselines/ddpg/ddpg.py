@@ -1,7 +1,6 @@
-import os
-import time
+import os, time, pickle
 from collections import deque
-import pickle
+import os.path as osp
 
 from baselines.ddpg.ddpg_learner import DDPG
 from baselines.ddpg.models import Actor, Critic
@@ -18,11 +17,9 @@ try:
 except ImportError:
     MPI = None
 
-def learn(network, env, total_timesteps,
-          nsteps=None,
-          log_interval=None,
+def learn(network, env, nsteps, total_timesteps,
+          log_interval=1,
           seed=None,
-          nb_epochs=None, # with default settings, perform 1M steps total
           reward_scale=1.0,
           render=False,
           render_eval=False,
@@ -37,10 +34,10 @@ def learn(network, env, total_timesteps,
           clip_norm=None,
           nb_train_steps=50, # per epoch cycle and MPI worker,
           nb_eval_steps=100,
-          batch_size=64, # per MPI worker
           tau=0.01,
           eval_env=None,
           param_noise_adaption_interval=50,
+          load_path=None,
           **network_kwargs):
 
     set_global_seeds(seed)
@@ -96,8 +93,19 @@ def learn(network, env, total_timesteps,
         actor_lr=actor_lr, critic_lr=critic_lr, enable_popart=popart, clip_norm=clip_norm,
         reward_scale=reward_scale)
 
-    logger.info('Using agent with the following configuration:')
-    logger.info(str(agent.__dict__.items()))
+    #logger.info('Using agent with the following configuration:')
+    #logger.info(str(agent.__dict__.items()))
+
+    if load_path is not None:
+        agent.load(osp.join(load_path, 'checkpoints/last'))
+        print('Model has been successfully loaded from {0}'.format(load_path))
+    else:
+        try:
+            lp = logger.get_dir()
+            agent.actor.load(osp.join(lp, 'checkpoints/last'))
+            print('Model has been successfully loaded from {0}'.format(lp))
+        except Exception as e:
+            print(e)
 
     eval_episode_rewards_history = deque(maxlen=100)
     episode_rewards_history = deque(maxlen=100)
@@ -115,7 +123,6 @@ def learn(network, env, total_timesteps,
     t = 0 # scalar
 
     epoch = 0
-
 
 
     start_time = time.time()
@@ -297,6 +304,12 @@ def learn(network, env, total_timesteps,
             if eval_env and hasattr(eval_env, 'get_state'):
                 with open(os.path.join(logdir, 'eval_env_state.pkl'), 'wb') as f:
                     pickle.dump(eval_env.get_state(), f)
+
+        checkdir = osp.join(logger.get_dir(), 'checkpoints')
+        os.makedirs(checkdir, exist_ok=True)
+        savepath = osp.join(checkdir, 'last')
+        print('Saving to {0}'.format(savepath))
+        agent.actor.save(savepath)
 
     agent.sess.close()
     return agent

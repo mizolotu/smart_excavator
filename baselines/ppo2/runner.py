@@ -1,5 +1,9 @@
+import winreg, requests
 import numpy as np
+
 from baselines.common.runners import AbstractEnvRunner
+from time import sleep
+from subprocess import Popen, DEVNULL
 
 class Runner(AbstractEnvRunner):
 
@@ -12,40 +16,97 @@ class Runner(AbstractEnvRunner):
     - Make a mini batch
     """
 
-    def __init__(self, *, env, model, nsteps, gamma, lam):
+    def __init__(self, *, env, model, nsteps, gamma, lam, mvs):
         super().__init__(env=env, model=model, nsteps=nsteps)
         self.lam = lam
         self.gamma = gamma
+        self.mvs = mvs
+
+    def start(self, render, n_attempts=25):
+        http_url = 'http://127.0.0.1:5000/id'
+        regkey = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r'Software\WOW6432Node\Mevea\Mevea Simulation Software')
+        (solverpath, _) = winreg.QueryValueEx(regkey, 'InstallPath')
+        solverpath += r'\Bin\MeveaSolver.exe'
+        winreg.CloseKey(regkey)
+        if render:
+            solver_args = [solverpath, r'/mvs', self.mvs]
+        else:
+            solver_args = [solverpath, r'/headless', r'/mvs', self.mvs]
+        proc = []
+        for i in range(self.env.num_envs):
+            print('Trying to start solver {0}...'.format(i))
+            ready = False
+            while not ready:
+                assigned = False
+                attempt = 0
+                sleep(i)
+                solver_proc = Popen(solver_args, stderr=DEVNULL, stdout=DEVNULL)
+                while not assigned:
+                    try:
+                        j = requests.get(http_url, json={'id': i}).json()
+                        assigned = j['assigned']
+                    except Exception as e:
+                        print('Exception when assigning id:')
+                        print(e)
+                    attempt += 1
+                    if attempt >= n_attempts:
+                        break
+                    sleep(1.0)
+                if assigned:
+                    ready = True
+                    print('Solver {0} has successfully started!'.format(i))
+                    proc.append(solver_proc)
+                else:
+                    print('Could not start solver {0} :( Trying again...'.format(i))
+                    solver_proc.terminate()
+        return proc
+
+    def stop(self, proc):
+        http_url = 'http://127.0.0.1:5000/id'
+        for pi, p in enumerate(proc):
+            assigned = True
+            while assigned:
+                try:
+                    j = requests.post(http_url, json={'id': pi}).json()
+                    assigned = j['assigned']
+                except Exception as e:
+                    print('Exception when reseting id:')
+                    print(e)
+            p.terminate()
 
     def run(self, eval=False, render=False):
 
-        # here, we init the lists that will contain the mb of experiences
+        # start mevea simulator and reset frontends
+
+        proc = self.start(render)
+        self.obs[:] = self.env.reset()
+
+        # init experience minibatches
 
         mb_obs, mb_rewards, mb_actions, mb_values, mb_dones, mb_neglogpacs = [],[],[],[],[],[]
         mb_states = self.states
         epinfos = []
 
-        # for n in range number of steps
+        # act in environments step by step
 
         scores = [[] for _ in range(self.env.num_envs)]
         steps = [0 for _ in range(self.env.num_envs)]
         for _ in range(self.nsteps):
 
-            # given observations, get action value and neglopacs, we already have self.obs because Runner superclass run self.obs[:] = env.reset() on init
+            # given observations, get action value and neglopacs
 
             if eval:
                 actions, values, self.states, neglogpacs = self.model.eval_step(self.obs, S=self.states, M=self.dones)
-                if render:
-                    self.env.render()
             else:
                 actions, values, self.states, neglogpacs = self.model.step(self.obs, S=self.states, M=self.dones)
+
             mb_obs.append(self.obs.copy())
             mb_actions.append(actions)
             mb_values.append(values)
             mb_neglogpacs.append(neglogpacs)
             mb_dones.append(self.dones)
 
-            # take actions in env and look the results
+            # take actions and check results
 
             self.obs[:], rewards, self.dones, infos = self.env.step(actions)
             for i in range(len(infos)):
@@ -54,8 +115,13 @@ class Runner(AbstractEnvRunner):
                 if 'l' in infos[i].keys() and infos[i]['l'] > steps[i]:
                     steps[i] = infos[i]['l']
             mb_rewards.append(rewards)
+
         for i in range(self.env.num_envs):
             epinfos.append({'r': np.mean(scores[i]), 'l': steps[i]})
+
+        # stop the simulator
+
+        self.stop(proc)
 
         # batch of steps to batch of rollouts
 
@@ -86,5 +152,3 @@ class Runner(AbstractEnvRunner):
 def sf01(arr):
     s = arr.shape
     return arr.swapaxes(0, 1).reshape(s[0] * s[1], *s[2:])
-
-

@@ -6,6 +6,7 @@ from baselines import logger
 from collections import deque
 from baselines.common import explained_variance, set_global_seeds
 from baselines.common.policies import build_policy
+from baselines.ppo2.model import Model
 try:
     from mpi4py import MPI
 except ImportError:
@@ -17,79 +18,25 @@ def constfn(val):
         return val
     return f
 
-def learn(network, env, total_timesteps, load_path,
-    eval_env=None,
+def learn(network, env, nsteps, total_timesteps, mvs,
     seed=None,
-    nsteps=120,
     ent_coef=0.0,
     lr=1e-3,
     vf_coef=0.5,
     max_grad_norm=0.5,
+    noptepochs=4,
     gamma=0.99,
     lam=0.95,
     log_interval=10,
-    nminibatches=2,
-    noptepochs=4,
     cliprange=0.2,
-    save_interval=10,
+    save_interval=1,
     model_fn=None,
     update_fn=None,
     init_fn=None,
     mpi_rank_weight=1,
     comm=None,
+    load_path=None,
     **network_kwargs):
-
-    '''
-    Learn policy using PPO algorithm (https://arxiv.org/abs/1707.06347)
-
-    Parameters:
-    ----------
-
-    network:                          policy network architecture. Either string (mlp, lstm, lnlstm, cnn_lstm, cnn, cnn_small, conv_only - see baselines.common/models.py for full list)
-                                      specifying the standard network architecture, or a function that takes tensorflow tensor as input and returns
-                                      tuple (output_tensor, extra_feed) where output tensor is the last network layer output, extra_feed is None for feed-forward
-                                      neural nets, and extra_feed is a dictionary describing how to feed state into the network for recurrent neural nets.
-                                      See common/models.py/lstm for more details on using recurrent nets in policies
-
-    env: baselines.common.vec_env.VecEnv     environment. Needs to be vectorized for parallel environment simulation.
-                                      The environments produced by gym.make can be wrapped using baselines.common.vec_env.DummyVecEnv class.
-
-
-    nsteps: int                       number of steps of the vectorized environment per update (i.e. batch size is nsteps * nenv where
-                                      nenv is number of environment copies simulated in parallel)
-
-    total_timesteps: int              number of timesteps (i.e. number of actions taken in the environment)
-
-    ent_coef: float                   policy entropy coefficient in the optimization objective
-
-    lr: float or function             learning rate, constant or a schedule function [0,1] -> R+ where 1 is beginning of the
-                                      training and 0 is the end of the training.
-
-    vf_coef: float                    value function loss coefficient in the optimization objective
-
-    max_grad_norm: float or None      gradient norm clipping coefficient
-
-    gamma: float                      discounting factor
-
-    lam: float                        advantage estimation discounting factor (lambda in the paper)
-
-    log_interval: int                 number of timesteps between logging events
-
-    nminibatches: int                 number of training minibatches per update. For recurrent policies,
-                                      should be smaller or equal than number of environments run in parallel.
-
-    noptepochs: int                   number of training epochs per update
-
-    cliprange: float or function      clipping range, constant or schedule function [0,1] -> R+ where 1 is beginning of the training
-                                      and 0 is the end of the training
-
-    save_interval: int                number of timesteps between saving events
-
-    load_path: str                    path to load the model from
-
-    **network_kwargs:                 keyword arguments to the policy / network builder. See baselines.common/policies.py/build_policy and arguments to a particular type of network
-                                      For instance, 'mlp' network architecture has arguments num_hidden and num_layers.
-    '''
 
     set_global_seeds(seed)
     if isinstance(lr, float): lr = constfn(lr)
@@ -98,21 +45,20 @@ def learn(network, env, total_timesteps, load_path,
     else: assert callable(cliprange)
     total_timesteps = int(total_timesteps)
 
+    # build policy
+
     policy = build_policy(env, network, **network_kwargs)
 
-    # Get the nb of env
-    nenvs = env.num_envs
-
-    # Get state_space and action_space
-    ob_space = env.observation_space
-    ac_space = env.action_space
-
     # Calculate the batch_size
+
+    nenvs = env.num_envs
+    nminibatches = 1
     nbatch = nenvs * nsteps
     nbatch_train = nbatch // nminibatches
     is_mpi_root = (MPI is None or MPI.COMM_WORLD.Get_rank() == 0)
 
     # Instantiate the model object (that creates act_model and train_model)
+
     if model_fn is None:
         from baselines.ppo2.model import Model
         model_fn = Model
@@ -140,61 +86,52 @@ def learn(network, env, total_timesteps, load_path,
         except Exception as e:
             print(e)
 
-    # Instantiate the runner object
-    runner = Runner(env=env, model=model, nsteps=nsteps, gamma=gamma, lam=lam)
-    if eval_env is not None:
-        eval_runner = Runner(env=eval_env, model=model, nsteps=nsteps, gamma=gamma, lam=lam)
+    # Instantiate the runner object and episode buffer
 
+    runner = Runner(env=env, model=model, nsteps=nsteps, gamma=gamma, lam=lam, mvs=mvs)
     epinfobuf = deque(maxlen=log_interval*nenvs)
-    if eval_env is not None:
-        eval_epinfobuf = deque(maxlen=log_interval*nenvs)
 
     if init_fn is not None:
         init_fn()
 
     # Start total timer
+
     tfirststart = time.perf_counter()
 
     nupdates = total_timesteps//nbatch
     for update in range(1, nupdates+1):
         assert nbatch % nminibatches == 0
-        # Start timer
         tstart = time.perf_counter()
         frac = 1.0 - (update - 1.0) / nupdates # decreases from 1 to 0
-        # Calculate the learning rate
         lrnow = lr(frac)
-        # Calculate the cliprange
         cliprangenow = cliprange(frac)
 
         if update % log_interval == 0 and is_mpi_root: logger.info('Stepping environment...')
 
         # Get minibatch
+
         obs, returns, masks, actions, values, neglogpacs, states, epinfos = runner.run() #pylint: disable=E0632
-        if eval_env is not None:
-            eval_obs, eval_returns, eval_masks, eval_actions, eval_values, eval_neglogpacs, eval_states, eval_epinfos = eval_runner.run(eval=True) #pylint: disable=E0632
 
         if update % log_interval == 0 and is_mpi_root: logger.info('Done.')
 
         epinfobuf.extend(epinfos)
-        if eval_env is not None:
-            eval_epinfobuf.extend(eval_epinfos)
 
         # Here what we're going to do is for each minibatch calculate the loss and append it.
+
         mblossvals = []
         if states is None: # nonrecurrent version
-            # Index of each element of batch_size
-            # Create the indices array
+
             inds = np.arange(nbatch)
             for _ in range(noptepochs):
-                # Randomize the indexes
                 np.random.shuffle(inds)
-                # 0 to batch_size with batch_train_size step
                 for start in range(0, nbatch, nbatch_train):
                     end = start + nbatch_train
                     mbinds = inds[start:end]
                     slices = (arr[mbinds] for arr in (obs, returns, masks, actions, values, neglogpacs))
                     mblossvals.append(model.train(lrnow, cliprangenow, *slices))
+
         else: # recurrent version
+
             assert nenvs % nminibatches == 0
             envsperbatch = nenvs // nminibatches
             envinds = np.arange(nenvs)
@@ -210,19 +147,14 @@ def learn(network, env, total_timesteps, load_path,
                     # print(states.shape, mbstates.shape)
                     mblossvals.append(model.train(lrnow, cliprangenow, *slices, mbstates))
 
-        # Feedforward --> get losses --> update
         lossvals = np.mean(mblossvals, axis=0)
-        # End timer
         tnow = time.perf_counter()
-        # Calculate the fps (frame per second)
         fps = int(nbatch / (tnow - tstart))
 
         if update_fn is not None:
             update_fn(update)
 
         if update % log_interval == 0 or update == 1:
-            # Calculates if value function is a good predicator of the returns (ev > 1)
-            # or if it's just worse than predicting nothing (ev =< 0)
             ev = explained_variance(values, returns)
             logger.logkv("misc/serial_timesteps", update*nsteps)
             logger.logkv("misc/nupdates", update)
@@ -234,9 +166,6 @@ def learn(network, env, total_timesteps, load_path,
             logger.logkv('stats/eprewmin', np.min([epinfo['r'] for epinfo in epinfobuf]))
             logger.logkv('stats/eprewmax', np.max([epinfo['r'] for epinfo in epinfobuf]))
             logger.logkv('stats/eplenmean', safemean([epinfo['l'] for epinfo in epinfobuf]))
-            if eval_env is not None:
-                logger.logkv('stats/eval_eprewmean', safemean([epinfo['r'] for epinfo in eval_epinfobuf]) )
-                logger.logkv('stats/eval_eplenmean', safemean([epinfo['l'] for epinfo in eval_epinfobuf]) )
             logger.logkv('misc/time_elapsed', tnow - tfirststart)
             for (lossval, lossname) in zip(lossvals, model.loss_names):
                 logger.logkv('misc/' + lossname, lossval)
@@ -251,6 +180,51 @@ def learn(network, env, total_timesteps, load_path,
 
     model.sess.close()
     return model
+
+def demonstrate(network, env, nsteps, mvs,
+    ent_coef=0.0,
+    vf_coef=0.5,
+    max_grad_norm=0.5,
+    mpi_rank_weight=1,
+    comm=None,
+    gamma=0.99,
+    lam=0.95,
+    load_path=None
+):
+
+    policy = build_policy(env, network)
+
+    model = Model(
+        policy=policy,
+        nbatch_act=1,
+        nbatch_train=None,
+        nsteps=nsteps,
+        ent_coef=ent_coef,
+        vf_coef=vf_coef,
+        max_grad_norm=max_grad_norm,
+        comm=comm,
+        mpi_rank_weight=mpi_rank_weight
+    )
+
+    if load_path is not None:
+        model.load(load_path)
+        print('Model has been successfully loaded from {0}'.format(load_path))
+    else:
+        try:
+            lp = osp.join(logger.get_dir(), 'checkpoints/last')
+            model.load(lp)
+            print('Model has been successfully loaded from {0}'.format(lp))
+        except Exception as e:
+            print(e)
+            print('No model has been loaded. Neural network with random weights is used.')
+
+    # Instantiate the runner object and episode buffer
+
+    runner = Runner(env=env, model=model, nsteps=nsteps, gamma=gamma, lam=lam, mvs=mvs)
+    obs, returns, masks, actions, values, neglogpacs, states, epinfos = runner.run(render=True)
+
+    print('Demo completed! Reward: {0}'.format(epinfos[0]['r']))
+    print('Ctrl+C to stop the demo!')
 
 def safemean(xs):
     return np.nan if len(xs) == 0 else np.mean(xs)

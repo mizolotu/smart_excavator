@@ -1,5 +1,5 @@
 from copy import copy
-from functools import reduce
+from functools import reduce, partial
 
 import numpy as np
 import tensorflow as tf
@@ -9,6 +9,8 @@ from baselines import logger
 from baselines.common.mpi_adam import MpiAdam
 import baselines.common.tf_util as U
 from baselines.common.mpi_running_mean_std import RunningMeanStd
+from baselines.common.tf_util import get_session, save_variables, load_variables
+
 try:
     from mpi4py import MPI
 except ImportError:
@@ -370,6 +372,8 @@ class DDPG(object):
         self.actor_optimizer.sync()
         self.critic_optimizer.sync()
         self.sess.run(self.target_init_updates)
+        self.save = partial(save_variables, sess=sess)
+        self.load = partial(load_variables, sess=sess)
 
     def update_target_net(self):
         self.sess.run(self.target_soft_updates)

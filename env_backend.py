@@ -1,11 +1,13 @@
-import sys, requests, json
+import sys, requests
 import numpy as np
 from time import time, sleep
 
 # Data names
 
 data_names = {
-    'timestamps': ['Time'],
+    'timestamps': [
+        'Time'
+    ],
     'controls': [
         'Input_Slew RealValue',
         'Input_BoomLift RealValue',
@@ -46,7 +48,9 @@ component_controls = [p.split(' ')[0] for p in data_names['controls']]
 
 p_controller_frequency = 1000  # Hz
 eps = 1e-10  # to prevent dividing by zero
-target_thr = 2.5  # target component is considered being reached if the distance between the target and the current component value is below this threshold
+target_thr = 1.5  # target component is considered being reached if the distance between the target and the current component value is below this threshold
+mass_thr = 10  # digging is detected if mass exceeds this threshold, dumping is detected when mass becomes less than this threshold
+dig_emp_angle_diff_thr = 3.0  # emptying is detected if difference between dig slew and dump slew exceeds this threshold
 
 # dimensions
 
@@ -59,11 +63,7 @@ http_url = 'http://127.0.0.1:5000'
 register_uri = 'register'
 mode_uri = 'mode'
 target_uri = 'p_target'
-
-# User input file
-
-user_input_fname = 'C:\\Users\\iotli\\\PycharmProjects\\SmartExcavator\\user_input\\user_input.txt'
-open(user_input_fname, 'w').close()
+dig_emp_uri = 'targets'
 
 def register():
     uri = '{0}/{1}'.format(http_url, register_uri)
@@ -92,17 +92,6 @@ def pid_controls(current, previous, action, delta_time, integ_prev, gains=[[100,
     controls = - (gains[0, :] * p + gains[1, :] * i + gains[2, :] * d)
     return controls, i
 
-def p_controls(current, action, gains=[100, 100, 100, 100]):
-    current = np.array(current)
-    target = np.array(action[:action_dim])
-    if len(action) > action_dim:
-        gains = np.array(action[action_dim:])
-    else:
-        gains = np.array(gains)
-    p = target - current
-    controls = np.nan_to_num(-p * gains)
-    return controls
-
 def get_mode(id):
     uri = '{0}/{1}'.format(http_url, mode_uri)
     try:
@@ -127,6 +116,11 @@ def get_target(id, point, last_point, time_passed, soil_mass, dumped_mass, colli
         target = None
         mode = None
     return target, mode
+
+def post_targets(id, dig_target, emp_target):
+    uri = '{0}/{1}'.format(http_url, dig_emp_uri)
+    jdata = {'id': id, 'targets': [dig_target, emp_target]}
+    r = requests.post(uri, json=jdata)
 
 
 ##### I N I T  S C R I P T #####
@@ -177,6 +171,8 @@ def initScript():
     GObject.data['integ_prev'] = 0
     GObject.data['time_passed'] = 0
     GObject.data['target_position'] = None
+    GObject.data['dig'] = None
+    GObject.data['emp'] = None
 
 
 ##### C A L L  S C R I P T #####
@@ -209,17 +205,22 @@ def callScript(deltaTime, simulationTime):
     # if the simulator is under user control write position to a file and check mode every iteration
 
     if GObject.data['mode'] == 'USER':
-        t = time() - GObject.data['start_time']
-        line = ','.join([str(t)] + [str(val) for val in real_values])
-        with open(user_input_fname, 'a') as f:
-            f.write(line + '\n')
+        if GObject.data['dig'] is None and score_values[0] > mass_thr:
+            GObject.data['dig'] = real_values
+            print('Dig here: {0}'.format(real_values))
+        elif GObject.data['dig'] is not None and GObject.data['emp'] is None and score_values[0] < mass_thr and np.abs(GObject.data['dig'][0] - real_values[0]) > dig_emp_angle_diff_thr:
+            GObject.data['emp'] = real_values
+            print('Dump here: {0}'.format(real_values))
+        elif GObject.data['dig'] is not None and GObject.data['emp'] is not None:
+            post_targets(GObject.data['id'], GObject.data['dig'], GObject.data['emp'])
+
         mode = get_mode(GObject.data['id'])
         if mode is not None:
             GObject.data['mode'] = mode
 
     # if the simulator is under AI control
 
-    else: # if GObject.data['mode'].startswith('AI'):
+    else:
 
         # if the target is not set, ask for it immediately
 
@@ -268,7 +269,6 @@ def callScript(deltaTime, simulationTime):
                     # if mode is USER, clean previous user input and nulify the state
 
                     if mode == 'USER':
-                        open(user_input_fname, 'w').close()
                         print('\nUSER INPUT\n')
                         GObject.data['is_target_set'] = False
                         GObject.data['ground_volume'] = 0
@@ -289,7 +289,7 @@ def callScript(deltaTime, simulationTime):
 
                 # processs target
 
-                if target is not None:
+                if target is not None and target != GObject.data['target_position']:
                     GObject.data['integ_prev'] = 0
                     GObject.data['target_position'] = target
                     GObject.data['is_target_set'] = True
