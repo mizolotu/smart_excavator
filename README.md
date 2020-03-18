@@ -34,7 +34,7 @@ python excavator_demo.py -m path_to_the_excavator_mvs
 
 Once the solver has started, use joysticks or keyboard to grab some soil with the excavator and put it to the dumper. After that, the reinforcement learning agent kicks in and attempts to complete the work. 
 
-![](cartman.gif | width=100)![](cartman.gif | width=100)
+![Demonstration example](gifs/demo.gif)![Residual policy](gifs/residual.gid)
 
 
 ## Continue training
