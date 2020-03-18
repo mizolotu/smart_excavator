@@ -32,7 +32,7 @@ In terminal, navigate to "SmartExcavator" directory and run:
 python excavator_demo.py -m path_to_the_excavator_mvs
 ```
 
-Once the solver has started, use joysticks or keyboard to grab some soil with the excavator and put it to the dumper. After that, the reinforcement learning agent kicks in and attempts to complete the work. 
+Once the solver has started, use joysticks or keyboard to grab some soil with the excavator and put it to the dumper. After that, the reinforcement learning agent kicks in and attempts to complete the work. Example video: https://drive.google.com/file/d/1z38CNQQBw6QHNU9lxbNCOE5diX1812oR/view?usp=sharing.
 
 ## Continue training
 
