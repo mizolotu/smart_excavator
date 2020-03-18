@@ -36,12 +36,14 @@ Once the solver has started, use joysticks or keyboard to grab some soil with th
 
 ## Continue training
 
-Residual policy has been learned for 4-5 days, while pure - only for several hours so far. To continue training, substitute "policy_name" with either "residual" or "pure" (default: residual) and specify number of environments (default: 2), for example:
+Residual policy has been learned for few days, while pure - only for several hours so far. To continue training, substitute "policy_name" with either "residual" or "pure" (default: residual) and specify number of environments (default: 2), for example:
 ```bash
 python excavator_demo.py -m path_to_the_excavator_mvs -t train -p residual -n 2
 ```
 
 Both pure and residual policies are learned using OpenAI's implementation of proximal policy optimization (PPO2) algorithm. The difference is that in case of pure reinforcement learning, demonstration data is only used to navigate the excavator to the target, after that the agent starts exploring the environment. In case of residual learning, the resulting policy is equal to sum of the agent policy and the best (in terms of the amount of soil grabbed) demonstration example. According to https://arxiv.org/pdf/1906.05841.pdf, residual learning outperforms other forms of learning from demonstration. 
+
+The amount of trainable variables of the neural network can be increased in "baselines/common/models.py". Find the "mlp" model and increase the number of layers and the number of neurons in the hidden layers, e.g. num_layers=3 and num_hidden=256. Bigger numbers of parameters require more iterations to train, but in theory the resulting model should perform better. Regardless of the neural network architecture, at least one week of training is required to see some progress.  
 
 ## Other scripts
 
