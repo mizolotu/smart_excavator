@@ -18,7 +18,7 @@ def constfn(val):
         return val
     return f
 
-def learn(network, env, nsteps, total_timesteps, mvs,
+def learn(network, env, nsteps, total_timesteps, mvs, ckpt,
     seed=None,
     ent_coef=0.0,
     lr=1e-3,
@@ -80,7 +80,7 @@ def learn(network, env, nsteps, total_timesteps, mvs,
         print('Model has been successfully loaded from {0}'.format(load_path))
     else:
         try:
-            lp = osp.join(logger.get_dir(), 'checkpoints/last')
+            lp = osp.join(logger.get_dir(), 'checkpoints/{0}'.format(ckpt))
             model.load(lp)
             print('Model has been successfully loaded from {0}'.format(lp))
         except Exception as e:
@@ -90,6 +90,7 @@ def learn(network, env, nsteps, total_timesteps, mvs,
 
     runner = Runner(env=env, model=model, nsteps=nsteps, gamma=gamma, lam=lam, mvs=mvs)
     epinfobuf = deque(maxlen=log_interval*nenvs)
+    best_reward = -np.inf
 
     if init_fn is not None:
         init_fn()
@@ -177,11 +178,16 @@ def learn(network, env, nsteps, total_timesteps, mvs,
             savepath = osp.join(checkdir, 'last')
             print('Saving to', savepath)
             model.save(savepath)
+            if safemean([epinfo['r'] for epinfo in epinfobuf]) > best_reward:
+                savepath = osp.join(checkdir, 'best')
+                print('Saving to', savepath)
+                model.save(savepath)
+                best_reward = safemean([epinfo['r'] for epinfo in epinfobuf])
 
     model.sess.close()
     return model
 
-def demonstrate(network, env, nsteps, mvs,
+def demonstrate(network, env, nsteps, mvs, ckpt,
     ent_coef=0.0,
     vf_coef=0.5,
     max_grad_norm=0.5,
@@ -211,7 +217,7 @@ def demonstrate(network, env, nsteps, mvs,
         print('Model has been successfully loaded from {0}'.format(load_path))
     else:
         try:
-            lp = osp.join(logger.get_dir(), 'checkpoints/last')
+            lp = osp.join(logger.get_dir(), 'checkpoints/{0}'.format(ckpt))
             model.load(lp)
             print('Model has been successfully loaded from {0}'.format(lp))
         except Exception as e:
@@ -224,7 +230,7 @@ def demonstrate(network, env, nsteps, mvs,
     obs, returns, masks, actions, values, neglogpacs, states, epinfos = runner.run(render=True)
 
     print('Demo completed! Reward: {0}'.format(epinfos[0]['r']))
-    print('Ctrl+C to stop the demo!')
+    print('\nPress Ctrl+C to stop the demo...')
 
 def safemean(xs):
     return np.nan if len(xs) == 0 else np.mean(xs)

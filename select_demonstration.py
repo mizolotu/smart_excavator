@@ -51,6 +51,7 @@ def retrieve_original_dataset(data_dir='data/raw', tkey='Time', xkeys=['ForceR_S
             t = np.arange(nsteps) * (tmax - tmin) / nsteps + tmin
             for j in range(piece.shape[1]):
                 x[:, j] = np.interp(t, piece_time, piece[:, j])
+            data[-1].append(x)
     return data
 
 def augment_data(sample, d_min=80, d_max=110):
@@ -181,8 +182,6 @@ def generate_demonstration_dataset(fname, mvs,
                 else:
                     sleep(delay)
         requests.post('{0}/{1}'.format(http_url, mode_uri), json={'mode': 'AI_TRAIN'}).json()
-        print('Started:')
-        print(backend)
         idx = np.arange(len(data_orig))
         sample_orig = data_orig[np.random.choice(idx)]
         dsa = augment_data(sample_orig)
@@ -222,22 +221,23 @@ def generate_demonstration_dataset(fname, mvs,
                 mass[i] = backend['m']
                 if mass[i] > m_thr and dig_target is None:
                     dig_target = backend['x']
-                elif mass[i] < m_thr and dig_target is not None and emp_target is None and np.abs(dig_target[0] - backend['x'][0]) < a_thr:
+                elif mass[i] < m_thr and dig_target is not None and emp_target is None and np.abs(dig_target[0] - backend['x'][0]) > a_thr:
                     emp_target = backend['x']
 
             # check the targets
 
-            if dig_target is not None and emp_target is not None:
+            if dig_target is not None:
                 dig_target_angle = dig_target[0]
-                emp_target_angle = emp_target[0]
                 didx = np.where((cycle[:, 0] > dig_target_angle - a_thr) & (cycle[:, 0] < dig_target_angle + a_thr))[0]
+            if emp_target is not None:
+                emp_target_angle = emp_target[0]
                 eidx = np.where((cycle[:, 0] > emp_target_angle - a_thr) & (cycle[:, 0] < emp_target_angle + a_thr))[0]
-                print(i, dig_target_angle, emp_target_angle, len(didx), len(eidx))
 
             # save the stats
 
             c = (cycle - np.ones((cycle.shape[0], 1)) * x_min) / (np.ones((cycle.shape[0], 1)) * (x_max - x_min + 1e-10))
             T.append((time() - cycle_time_start) / t_max)
+
             if dig_target is not None:
                 Digs.append(c[didx, :])
                 Xd.append((dig_target - x_min) / (x_max - x_min + 1e-10))
@@ -295,8 +295,6 @@ def generate_demonstration_dataset(fname, mvs,
         # stop the software
 
         requests.post('{0}/{1}'.format(http_url, mode_uri), json={'mode': 'RESTART'}).json()
-        print('stopped')
-        print(backend)
 
 def post_target(target=None, http_url='http://127.0.0.1:5000', uri='p_target'):
     url = '{0}/{1}'.format(http_url, uri)
@@ -321,7 +319,7 @@ if __name__ == '__main__':
 
     # file name to save dataset
 
-    fname = 'data/policy_data.txt'
+    fname = 'data/cycles.txt'
     if not osp.exists(fname):
         open(fname, 'a').close()
 

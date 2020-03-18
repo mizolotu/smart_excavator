@@ -22,5 +22,6 @@ if __name__ == '__main__':
 
     pp.plot(vals[:, upd_idx], vals[:, rew_idx], 'b')
     pp.errorbar(vals[:, upd_idx], vals[:, rew_idx], [vals[:, rew_idx] - vals[:, min_rew_idx], vals[:, max_rew_idx] - vals[:, rew_idx]], fmt='ok', color='blue', ecolor='blue', lw=3)
+    pp.xlabel('Number of iterations')
+    pp.ylabel('Reward')
     pp.show()
-

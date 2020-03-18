@@ -68,7 +68,7 @@ class ExcavatorEnv(gym.Env):
         action = (action - self.action_space.low) / (self.action_space.high - self.action_space.low)  # action values are now in range 0..1
         dig_deltas_std = action.reshape(self.n_steps, self.action_dim)
         dig_deltas = np.vstack([self.d_min + x * (self.d_max - self.d_min) for x in dig_deltas_std])  # action values are now in range d_min..d_max
-        if self.policy == 'mixed':
+        if self.policy == 'residual':
             dig_the_target = np.vstack([x + y for x, y in zip(dig_deltas, self.dig_trajectory)])  # 1..n_steps
         else:
             dig_the_target = np.vstack([x + self.dig_target for x in dig_deltas])  # 1..n_steps

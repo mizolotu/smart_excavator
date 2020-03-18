@@ -93,6 +93,7 @@ def target():
 def print_banner(fname='banner.txt'):
     with open(fname, 'r') as f:
         lines = f.readlines()
+    print('\n')
     for line in lines:
         print(line, end = '')
     print('\n')
@@ -103,8 +104,9 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-m', '--model', help='File path to the excavator model.', required=True)
-    parser.add_argument('-t', '--task', default='test', help='Task: train or test.', choices=['train', 'test'])
-    parser.add_argument('-p', '--policy', default='residual', help='Policy: ppo or residual.', choices=['ppo', 'residual'])
+    parser.add_argument('-t', '--task', default='test', help='Task.', choices=['train', 'test'])
+    parser.add_argument('-p', '--policy', default='residual', help='Policy.', choices=['pure', 'residual'])
+    parser.add_argument('-c', '--checkpoint', default='last', help='Model checkpoint.', choices=['last', 'best'])
     parser.add_argument('-n', '--nenvs', type=int, default=2, help='Number of environments for training.')
     args = parser.parse_args()
 
@@ -157,10 +159,10 @@ if __name__ == '__main__':
         env = SubprocVecEnv(env_fns)
 
     if args.task == 'train':
-        learn_th = Thread(target=learn, args=('mlp', env, nsteps, nsteps * nupdates // len(envs), args.model))
+        learn_th = Thread(target=learn, args=('mlp', env, nsteps, nsteps * nupdates // len(envs), args.model, args.checkpoint))
         learn_th.start()
     elif args.task == 'test':
-        test_th = Thread(target=demonstrate, args=('mlp', env, nsteps, args.model))
+        test_th = Thread(target=demonstrate, args=('mlp', env, nsteps, args.model, args.checkpoint))
         test_th.start()
     else:
         print('What?')
