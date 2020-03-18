@@ -178,7 +178,7 @@ def learn(network, env, nsteps, total_timesteps, mvs, ckpt,
             savepath = osp.join(checkdir, 'last')
             print('Saving to', savepath)
             model.save(savepath)
-            if safemean([epinfo['r'] for epinfo in epinfobuf]) > best_reward:
+            if len(epinfobuf) >= log_interval and safemean([epinfo['r'] for epinfo in epinfobuf]) > best_reward:
                 savepath = osp.join(checkdir, 'best')
                 print('Saving to', savepath)
                 model.save(savepath)
