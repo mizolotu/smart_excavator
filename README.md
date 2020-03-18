@@ -34,9 +34,6 @@ python excavator_demo.py -m path_to_the_excavator_mvs
 
 Once the solver has started, use joysticks or keyboard to grab some soil with the excavator and put it to the dumper. After that, the reinforcement learning agent kicks in and attempts to complete the work. 
 
-[![Demo CountPages alpha](https://share.gifyoutube.com/KzB6Gb.gif)](https://youtu.be/oqA7eG_HLhk)
-
-
 ## Continue training
 
 Residual policy has been learned for few days, while pure - only for several hours so far. To continue training, substitute "policy_name" with either "residual" or "pure" (default: residual) and specify number of environments (default: 2), for example:
