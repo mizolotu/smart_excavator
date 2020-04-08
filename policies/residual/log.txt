@@ -2335,3 +2335,21 @@ Done.
 | stats/eprewmin          | 0.285    |
 --------------------------------------
 Stepping environment...
+Done.
+--------------------------------------
+| misc/approxkl           | 0.0275   |
+| misc/clipfrac           | 0.297    |
+| misc/explained_variance | 0.374    |
+| misc/fps                | 0        |
+| misc/nupdates           | 1.23e+03 |
+| misc/policy_entropy     | 41.7     |
+| misc/policy_loss        | -0.0527  |
+| misc/serial_timesteps   | 9.84e+03 |
+| misc/time_elapsed       | 6.13e+05 |
+| misc/total_timesteps    | 1.97e+04 |
+| misc/value_loss         | 0.723    |
+| stats/eplenmean         | 8        |
+| stats/eprewmax          | 0.737    |
+| stats/eprewmean         | 0.613    |
+| stats/eprewmin          | 0.228    |
+--------------------------------------
