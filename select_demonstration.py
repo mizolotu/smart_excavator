@@ -158,7 +158,7 @@ def generate_demonstration_dataset(fname, mvs,
     dig_file = 'data/dig.txt',
     emp_file='data/emp.txt',
     n_steps = 8,
-    delay=1.0, x_thr=[3.0, 5.0, 5.0, 5.0], t_thr=3.0, m_thr=10.0, m_max=1000.0, t_max=60.0, a_thr=3.0
+    delay=1.0, x_thr=3.0, t_thr=3.0, m_thr=10.0, m_max=1000.0, t_max=60.0, a_thr=3.0
 ):
     regkey = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r'Software\WOW6432Node\Mevea\Mevea Simulation Software')
     (solverpath, _) = winreg.QueryValueEx(regkey, 'InstallPath')
@@ -213,7 +213,7 @@ def generate_demonstration_dataset(fname, mvs,
                     current = backend['x']
                     dist_to_x = np.abs(np.array(current) - target)
                     for j in range(4):
-                        if dist_to_x[j] < x_thr[j]:
+                        if dist_to_x[j] < x_thr:
                             in_target[j] = 1
                     if (time() - t_start) > t_thr:
                         break

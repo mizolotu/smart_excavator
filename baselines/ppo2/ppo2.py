@@ -187,15 +187,14 @@ def learn(network, env, nsteps, total_timesteps, mvs, ckpt,
     model.sess.close()
     return model
 
-def demonstrate(network, env, nsteps, mvs, ckpt,
+def demonstrate(network, env, nsteps, mvs, load_path,
     ent_coef=0.0,
     vf_coef=0.5,
     max_grad_norm=0.5,
     mpi_rank_weight=1,
     comm=None,
     gamma=0.99,
-    lam=0.95,
-    load_path=None
+    lam=0.95
 ):
 
     policy = build_policy(env, network)
@@ -216,13 +215,7 @@ def demonstrate(network, env, nsteps, mvs, ckpt,
         model.load(load_path)
         print('Model has been successfully loaded from {0}'.format(load_path))
     else:
-        try:
-            lp = osp.join(logger.get_dir(), 'checkpoints/{0}'.format(ckpt))
-            model.load(lp)
-            print('Model has been successfully loaded from {0}'.format(lp))
-        except Exception as e:
-            print(e)
-            print('No model has been loaded. Neural network with random weights is used.')
+        print('No model has been loaded. Neural network with random weights is used.')
 
     # Instantiate the runner object and episode buffer
 

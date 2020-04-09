@@ -116,8 +116,11 @@ if __name__ == '__main__':
 
     # configure logger
 
-    log_dir = 'policies/{0}'.format(args.policy)
-    logger.configure(log_dir)
+    if args.task == 'train':
+        log_dir = 'policies/{0}'.format(args.policy)
+        logger.configure(log_dir)
+    elif args.task == 'test':
+        load_path = 'policies/{0}/checkpoints/{1}'.format(args.policy, args.checkpoint)
 
     # min and max values
 
@@ -162,7 +165,7 @@ if __name__ == '__main__':
         learn_th = Thread(target=learn, args=('mlp', env, nsteps, nsteps * nupdates // len(envs), args.model, args.checkpoint))
         learn_th.start()
     elif args.task == 'test':
-        test_th = Thread(target=demonstrate, args=('mlp', env, nsteps, args.model, args.checkpoint))
+        test_th = Thread(target=demonstrate, args=('mlp', env, nsteps, args.model, load_path))
         test_th.start()
     else:
         print('What?')
