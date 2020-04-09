@@ -1,5 +1,10 @@
 # SmartExcavator
 
+## How it works?
+
+Slides: https://docs.google.com/presentation/d/1zghz1NY8mvjboHIhBuQBRlYX4yq5YN74vpu2CCoh68M/edit?usp=sharing
+Demonstration video: https://drive.google.com/open?id=1xaPrbcaeuSkuyYewuuIVlgGE9vkiKVN0
+
 ## Requirements
 
 1. Python 3.6.8 or higher
