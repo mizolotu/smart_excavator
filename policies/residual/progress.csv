@@ -1,0 +1,2 @@
+approxkl,clipfrac,eprewmax,eprewmean,eprewmin,explained_variance,nupdates,policy_entropy,policy_loss,time_elapsed,total_timesteps,value_loss
+0.005054041,0.09375,-0.11686063072275596,-0.31208720790953054,-0.5073137850963051,0.022166430950164795,1,45.40646,-0.031334747,228.9144659,16,1.1777406

@@ -1,1 +1,15 @@
 Logging to policies/residual
+-------------------------------------
+| approxkl           | 0.005054041  |
+| clipfrac           | 0.09375      |
+| eprewmax           | -0.117       |
+| eprewmean          | -0.312       |
+| eprewmin           | -0.507       |
+| explained_variance | 0.0222       |
+| nupdates           | 1            |
+| policy_entropy     | 45.40646     |
+| policy_loss        | -0.031334747 |
+| time_elapsed       | 229          |
+| total_timesteps    | 16           |
+| value_loss         | 1.1777406    |
+-------------------------------------
