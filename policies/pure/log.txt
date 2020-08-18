@@ -1,21 +1,21 @@
 Logging to policies/pure
 -------------------------------------
-| approxkl           | 0.0039527104 |
-| clipfrac           | 0.0859375    |
-| distmax            | 0.488        |
-| distmean           | 0.459        |
-| distmin            | 0.42         |
-| eprewmax           | 0.283        |
-| eprewmean          | -0.348       |
-| eprewmin           | -0.722       |
-| explained_variance | -0.00752     |
+| approxkl           | 0.0031301896 |
+| clipfrac           | 0.046875     |
+| distmax            | 0.473        |
+| distmean           | 0.458        |
+| distmin            | 0.429        |
+| eprewmax           | 0.809        |
+| eprewmean          | -0.377       |
+| eprewmin           | -1           |
+| explained_variance | -0.0175      |
 | nupdates           | 1            |
-| policy_entropy     | 45.40447     |
-| policy_loss        | -0.04211388  |
-| soilmassmax        | 0.144        |
-| soilmassmean       | 0.108        |
-| soilmassmin        | 0.0084       |
-| time_elapsed       | 328          |
+| policy_entropy     | 45.40326     |
+| policy_loss        | -0.04039586  |
+| soilmassmax        | 0.311        |
+| soilmassmean       | 0.109        |
+| soilmassmin        | 0            |
+| time_elapsed       | 343          |
 | total_timesteps    | 32           |
-| value_loss         | 2.4150019    |
+| value_loss         | 6.211796     |
 -------------------------------------
