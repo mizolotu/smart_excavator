@@ -15,7 +15,7 @@ Demonstration video: https://drive.google.com/open?id=1xaPrbcaeuSkuyYewuuIVlgGE9
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/mizolotu/SmartExcavator
+git clone https://github.com/mizolotu/SmartExcavator -b tf2
 ```
 
 2. From "SmartExcavator" directory, install required python packages (it is obviously recommended to create a new virtualenv and install everything there):
