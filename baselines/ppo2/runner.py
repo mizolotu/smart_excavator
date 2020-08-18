@@ -1,5 +1,6 @@
-import winreg, requests
 import numpy as np
+import tensorflow as tf
+import winreg, requests
 
 from baselines.common.runners import AbstractEnvRunner
 from time import sleep
@@ -7,22 +8,13 @@ from subprocess import Popen, DEVNULL
 
 class Runner(AbstractEnvRunner):
 
-    """
-    We use this object to make a mini batch of experiences
-    __init__:
-    - Initialize the runner
-
-    run():
-    - Make a mini batch
-    """
-
     def __init__(self, *, env, model, nsteps, gamma, lam, mvs):
         super().__init__(env=env, model=model, nsteps=nsteps)
         self.lam = lam
         self.gamma = gamma
         self.mvs = mvs
 
-    def start(self, render, n_attempts=25):
+    def start(self, render, n_attempts=25, delay=5.0):
         http_url = 'http://127.0.0.1:5000/id'
         regkey = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r'Software\WOW6432Node\Mevea\Mevea Simulation Software')
         (solverpath, _) = winreg.QueryValueEx(regkey, 'InstallPath')
@@ -34,6 +26,7 @@ class Runner(AbstractEnvRunner):
             solver_args = [solverpath, r'/headless', r'/mvs', self.mvs]
         proc = []
         for i in range(self.env.num_envs):
+            sleep(delay)
             print('Trying to start solver {0}...'.format(i))
             ready = False
             while not ready:
@@ -74,56 +67,55 @@ class Runner(AbstractEnvRunner):
                     print(e)
             p.terminate()
 
-    def run(self, eval=False, render=False):
+    def run(self, render=False):
 
         # start mevea simulator and reset frontends
 
         proc = self.start(render)
         self.obs[:] = self.env.reset()
 
-        # init experience minibatches
+        # Here, we init the lists that will contain the mb of experiences
 
         mb_obs, mb_rewards, mb_actions, mb_values, mb_dones, mb_neglogpacs = [],[],[],[],[],[]
         mb_states = self.states
         epinfos = []
-
-        # act in environments step by step
-
         scores = [[] for _ in range(self.env.num_envs)]
-        steps = [0 for _ in range(self.env.num_envs)]
+        masses = [[] for _ in range(self.env.num_envs)]
+        dists = [[] for _ in range(self.env.num_envs)]
+
+        # For n in range number of steps
+
         for _ in range(self.nsteps):
 
-            # given observations, get action value and neglopacs
-
-            if eval:
-                actions, values, self.states, neglogpacs = self.model.eval_step(self.obs, S=self.states, M=self.dones)
-            else:
-                actions, values, self.states, neglogpacs = self.model.step(self.obs, S=self.states, M=self.dones)
-
+            obs = tf.constant(self.obs)
+            actions, values, self.states, neglogpacs = self.model.step(obs)
+            actions = actions._numpy()
             mb_obs.append(self.obs.copy())
             mb_actions.append(actions)
-            mb_values.append(values)
-            mb_neglogpacs.append(neglogpacs)
+            mb_values.append(values._numpy())
+            mb_neglogpacs.append(neglogpacs._numpy())
             mb_dones.append(self.dones)
 
-            # take actions and check results
+            # Take actions in env and look the results
 
             self.obs[:], rewards, self.dones, infos = self.env.step(actions)
             for i in range(len(infos)):
                 if 'r' in infos[i].keys():
                     scores[i].append(infos[i]['r'])
-                if 'l' in infos[i].keys() and infos[i]['l'] > steps[i]:
-                    steps[i] = infos[i]['l']
+                if 'm' in infos[i].keys():
+                    masses[i].append(infos[i]['m'])
+                if 'd' in infos[i].keys():
+                    dists[i].append(infos[i]['d'])
             mb_rewards.append(rewards)
 
         for i in range(self.env.num_envs):
-            epinfos.append({'r': np.mean(scores[i]), 'l': steps[i]})
+            epinfos.append({'r': np.mean(scores[i]), 'm': np.mean(masses[i]), 'd': np.mean(dists[i])})
 
         # stop the simulator
 
         self.stop(proc)
 
-        # batch of steps to batch of rollouts
+        # Batch of steps to batch of rollouts
 
         mb_obs = np.asarray(mb_obs, dtype=self.obs.dtype)
         mb_rewards = np.asarray(mb_rewards, dtype=np.float32)
@@ -131,7 +123,7 @@ class Runner(AbstractEnvRunner):
         mb_values = np.asarray(mb_values, dtype=np.float32)
         mb_neglogpacs = np.asarray(mb_neglogpacs, dtype=np.float32)
         mb_dones = np.asarray(mb_dones, dtype=np.bool)
-        last_values = self.model.value(self.obs, S=self.states, M=self.dones)
+        last_values = self.model.value(tf.constant(self.obs))._numpy()
 
         # discount/bootstrap off value fn
 
@@ -147,8 +139,12 @@ class Runner(AbstractEnvRunner):
             delta = mb_rewards[t] + self.gamma * nextvalues * nextnonterminal - mb_values[t]
             mb_advs[t] = lastgaelam = delta + self.gamma * self.lam * nextnonterminal * lastgaelam
         mb_returns = mb_advs + mb_values
+
         return (*map(sf01, (mb_obs, mb_returns, mb_dones, mb_actions, mb_values, mb_neglogpacs)), mb_states, epinfos)
 
 def sf01(arr):
+    """
+    swap and then flatten axes 0 and 1
+    """
     s = arr.shape
     return arr.swapaxes(0, 1).reshape(s[0] * s[1], *s[2:])

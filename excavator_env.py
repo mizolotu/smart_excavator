@@ -33,13 +33,14 @@ class ExcavatorEnv(gym.Env):
 
         # thresholds and coefficients
 
-        self.dist_coeff = 0.5
-        self.mass_coeff = 0.5
+        self.turn_coeff = 1.0
+        self.move_coeff = 1.0
+        self.mass_coeff = 1.0
         self.mass_thr = 0.05
         self.x_min = np.array([-180.0, 3.9024162648733514, 13.252630737652677, 16.775050853637147])
         self.x_max = np.array([180.0, 812.0058600513476, 1011.7128949856826, 787.6024456729566])
-        self.d_min = np.array([-0.05, -0.3, -0.5, -0.8])
-        self.d_max = np.array([0.05, 0.3, 0.5, 0.8])
+        self.d_min = np.array([-0.1, -0.3, -0.5, -0.8])
+        self.d_max = np.array([0.1, 0.3, 0.5, 0.8])
         self.m_max = 1000.0
         self.t_max = 60.0
         self.delay_max = 3.0
@@ -54,6 +55,10 @@ class ExcavatorEnv(gym.Env):
         self.observation_space = gym.spaces.Box(low=0, high=1, shape=(obs_dim,), dtype=np.float)
         self.action_space = gym.spaces.Box(low=-1, high=1, shape=(action_dim * self.n_steps,), dtype=np.float)
         self.debug = False
+
+        # other
+
+        self.dist_d_max_d_min = np.linalg.norm(self.d_max[1:] - self.d_min[1:])
 
     def step(self, action, a_thr=3.0, x_thr=5.0):
 
@@ -72,6 +77,17 @@ class ExcavatorEnv(gym.Env):
             dig_the_target = np.vstack([x + y for x, y in zip(dig_deltas, self.dig_trajectory)])  # 1..n_steps
         else:
             dig_the_target = np.vstack([x + self.dig_target for x in dig_deltas])  # 1..n_steps
+
+        # calculate diging distance
+
+        d_dig = 0
+        for i in range(1, self.n_steps):
+            d_dig += np.linalg.norm(dig_the_target[i, 1:] - dig_the_target[i-1, 1:])
+        d_dig /= (self.n_steps - 1)
+        d_dig /= self.dist_d_max_d_min
+
+        # complete the trajectory
+
         turn_to_the_target = np.hstack([dig_the_target[0, 0], x_current[1:]])  # 0
         prepare_for_the_turn_to_the_dumper = np.hstack([dig_the_target[-1, 0], self.emp_trajectory[0, 1:]])  # n_steps + 1
         trajectory = np.vstack([turn_to_the_target, dig_the_target, prepare_for_the_turn_to_the_dumper, self.emp_trajectory])  # n_steps + 2..n_steps + 2 + emp_trajectory_len
@@ -110,12 +126,11 @@ class ExcavatorEnv(gym.Env):
                     break
                 elif i not in [0, self.n_steps + 2] and t_step_delta > self.delay_max:
                     break
-
             if i == self.n_steps + 2:
                 soil_grabbed = mass
         state = self._construct_state(x_dig, mass_max)
         self.step_count += 1
-        reward = self._calculate_reward(x_dig, soil_grabbed, n_collisions)
+        reward = self._calculate_reward(x_dig, d_dig, soil_grabbed, n_collisions)
         if self.debug:
             print(self.step_count, reward, time() - t_start)
             print(self.env_id, self.step_count, state, reward, x_dig)
@@ -127,7 +142,7 @@ class ExcavatorEnv(gym.Env):
             done = True
         else:
             done = False
-        return state, reward, done, {'r': reward, 'l': self.step_count}
+        return state, reward, done, {'r': reward, 'm': soil_grabbed, 'd': d_dig}
 
     def reset(self, delay=1.0):
 
@@ -220,10 +235,10 @@ class ExcavatorEnv(gym.Env):
             state[self.action_dim] = soil_taken
         return state
 
-    def _calculate_reward(self, x_dig, m_grabbed, n_collisions):
+    def _calculate_reward(self, x_dig, d_dig, m_grabbed, n_collisions):
         if x_dig is None or m_grabbed == 0:
             r = -1
         else:
-            dist_to_target = np.linalg.norm(x_dig - self.dig_target)
-            r = self.dist_coeff * (1 - dist_to_target) + self.mass_coeff * m_grabbed - self.collision_coeff * n_collisions
+            dist_to_target = np.abs(x_dig[0] - self.dig_target[0]) / (self.d_max[0] - self.d_min[0])
+            r = self.turn_coeff * (1 - dist_to_target) + self.move_coeff * (1 - d_dig) + self.mass_coeff * m_grabbed - self.collision_coeff * n_collisions
         return r

@@ -105,8 +105,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-m', '--model', help='File path to the excavator model.', required=True)
     parser.add_argument('-t', '--task', default='test', help='Task.', choices=['train', 'test'])
-    parser.add_argument('-p', '--policy', default='residual', help='Policy.', choices=['pure', 'residual'])
-    parser.add_argument('-c', '--checkpoint', default='last', help='Model checkpoint.', choices=['last', 'best'])
+    parser.add_argument('-p', '--policy', default='pure', help='Policy.', choices=['pure', 'residual'])
     parser.add_argument('-n', '--nenvs', type=int, default=2, help='Number of environments for training.')
     args = parser.parse_args()
 
@@ -120,14 +119,12 @@ if __name__ == '__main__':
         log_dir = 'policies/{0}'.format(args.policy)
         logger.configure(log_dir)
     elif args.task == 'test':
-        load_path = 'policies/{0}/checkpoints/{1}'.format(args.policy, args.checkpoint)
+        load_path = 'policies/{0}/checkpoints/'.format(args.policy)
 
     # min and max values
 
     x_min = np.array([-180.0, 3.9024162648733514, 13.252630737652677, 16.775050853637147])
     x_max = np.array([180.0, 812.0058600513476, 1011.7128949856826, 787.6024456729566])
-    d_min = np.array([-0.05, -0.5, -0.5, -0.8])
-    d_max = np.array([0.05, 0.5, 0.5, 0.8])
 
     # specify random target for training
 
@@ -162,7 +159,7 @@ if __name__ == '__main__':
         env = SubprocVecEnv(env_fns)
 
     if args.task == 'train':
-        learn_th = Thread(target=learn, args=('mlp', env, nsteps, nsteps * nupdates // len(envs), args.model, args.checkpoint))
+        learn_th = Thread(target=learn, args=('mlp', env, nsteps, nsteps * nupdates // len(envs), args.model))
         learn_th.start()
     elif args.task == 'test':
         test_th = Thread(target=demonstrate, args=('mlp', env, nsteps, args.model, load_path))

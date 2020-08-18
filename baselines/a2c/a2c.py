@@ -1,23 +1,19 @@
 import time
-import functools
 import tensorflow as tf
-import numpy as np
 
 from baselines import logger
 
 from baselines.common import set_global_seeds, explained_variance
-from baselines.common import tf_util
-from baselines.common.policies import build_policy
+from baselines.common.models import get_network_builder
+from baselines.common.policies import PolicyWithValue
 
-
-from baselines.a2c.utils import Scheduler, find_trainable_variables
+from baselines.a2c.utils import InverseLinearTimeDecay
 from baselines.a2c.runner import Runner
 from baselines.ppo2.ppo2 import safemean
+import os.path as osp
 from collections import deque
 
-from tensorflow import losses
-
-class Model(object):
+class Model(tf.keras.Model):
 
     """
     We use this class to :
@@ -31,94 +27,42 @@ class Model(object):
         save/load():
         - Save load the model
     """
-    def __init__(self, policy, env, nsteps,
+    def __init__(self, *, ac_space, policy_network, nupdates,
             ent_coef=0.01, vf_coef=0.5, max_grad_norm=0.5, lr=7e-4,
-            alpha=0.99, epsilon=1e-5, total_timesteps=int(80e6), lrschedule='linear'):
+            alpha=0.99, epsilon=1e-5, total_timesteps=int(80e6)):
 
-        tf.reset_default_graph()
-        self.sess = tf_util.get_session()
-        nenvs = env.num_envs
-        nbatch = nsteps * nenvs
+        super(Model, self).__init__(name='A2CModel')
+        self.train_model = PolicyWithValue(ac_space, policy_network, value_network=None, estimate_q=False)
+        lr_schedule = InverseLinearTimeDecay(initial_learning_rate=lr, nupdates=nupdates)
+        self.optimizer = tf.keras.optimizers.RMSprop(learning_rate=lr_schedule, rho=alpha, epsilon=epsilon)
 
-        with tf.variable_scope('a2c_model', reuse=tf.AUTO_REUSE):
-            # step_model is used for sampling
-            step_model = policy(nenvs, 1, self.sess)
+        self.ent_coef = ent_coef
+        self.vf_coef = vf_coef
+        self.max_grad_norm = max_grad_norm
+        self.step = self.train_model.step
+        self.value = self.train_model.value
+        self.initial_state = self.train_model.initial_state
 
-            # train_model is used to train our network
-            train_model = policy(nbatch, nsteps, self.sess)
+    @tf.function
+    def train(self, obs, states, rewards, masks, actions, values):
+        advs = rewards - values
+        with tf.GradientTape() as tape:
+            policy_latent = self.train_model.policy_network(obs)
+            pd, _ = self.train_model.pdtype.pdfromlatent(policy_latent)
+            neglogpac = pd.neglogp(actions)
+            entropy = tf.reduce_mean(pd.entropy())
+            vpred = self.train_model.value(obs)
+            vf_loss = tf.reduce_mean(tf.square(vpred - rewards))
+            pg_loss = tf.reduce_mean(advs * neglogpac)
+            loss = pg_loss - entropy * self.ent_coef + vf_loss * self.vf_coef
 
-        A = tf.placeholder(train_model.action.dtype, train_model.action.shape)
-        ADV = tf.placeholder(tf.float32, [nbatch])
-        R = tf.placeholder(tf.float32, [nbatch])
-        LR = tf.placeholder(tf.float32, [])
+        var_list = tape.watched_variables()
+        grads = tape.gradient(loss, var_list)
+        grads, _ = tf.clip_by_global_norm(grads, self.max_grad_norm)
+        grads_and_vars = list(zip(grads, var_list))
+        self.optimizer.apply_gradients(grads_and_vars)
 
-        # Calculate the loss
-        # Total loss = Policy gradient loss - entropy * entropy coefficient + Value coefficient * value loss
-
-        # Policy loss
-        neglogpac = train_model.pd.neglogp(A)
-        # L = A(s,a) * -logpi(a|s)
-        pg_loss = tf.reduce_mean(ADV * neglogpac)
-
-        # Entropy is used to improve exploration by limiting the premature convergence to suboptimal policy.
-        entropy = tf.reduce_mean(train_model.pd.entropy())
-
-        # Value loss
-        vf_loss = 0.5 * losses.mean_squared_error(tf.squeeze(train_model.vf), R)
-
-        loss = pg_loss - entropy*ent_coef + vf_loss * vf_coef
-
-        # Update parameters using loss
-        # 1. Get the model parameters
-        params = find_trainable_variables("a2c_model")
-
-        # 2. Calculate the gradients
-        grads = tf.gradients(loss, params)
-        if max_grad_norm is not None:
-            # Clip the gradients (normalize)
-            grads, grad_norm = tf.clip_by_global_norm(grads, max_grad_norm)
-        grads = list(zip(grads, params))
-        # zip aggregate each gradient with parameters associated
-        # For instance zip(ABCD, xyza) => Ax, By, Cz, Da
-
-        # 3. Make op for one policy and value update step of A2C
-        #trainer = tf.train.RMSPropOptimizer(learning_rate=LR, decay=alpha, epsilon=epsilon)
-        trainer = tf.train.AdamOptimizer(learning_rate=LR, epsilon=1e-5)
-
-        _train = trainer.apply_gradients(grads)
-
-        #lr = Scheduler(v=lr, nvalues=total_timesteps, schedule=lrschedule)
-
-        def train(obs, states, rewards, masks, actions, values):
-
-            # Here we calculate advantage A(s,a) = R + yV(s') - V(s)
-            # rewards = R + yV(s')
-
-            advs = rewards - values
-
-            #for step in range(len(obs)):
-            #    cur_lr = lr.value()
-
-            td_map = {train_model.X:obs, A:actions, ADV:advs, R:rewards, LR:lr}
-            if states is not None:
-                td_map[train_model.S] = states
-                td_map[train_model.M] = masks
-            policy_loss, value_loss, policy_entropy, _ = self.sess.run(
-                [pg_loss, vf_loss, entropy, _train],
-                td_map
-            )
-            return policy_loss, value_loss, policy_entropy
-
-
-        self.train = train
-        self.train_model = train_model
-        self.step_model = step_model
-        self.step = step_model.step
-        self.value = step_model.value
-        self.initial_state = step_model.initial_state
-        self.save = functools.partial(tf_util.save_variables, sess=self.sess)
-        self.load = functools.partial(tf_util.load_variables, sess=self.sess)
-        tf.global_variables_initializer().run(session=self.sess)
+        return pg_loss, vf_loss, entropy
 
 
 def learn(
@@ -128,9 +72,9 @@ def learn(
     nsteps=5,
     total_timesteps=int(80e6),
     vf_coef=0.5,
-    ent_coef=0.0,
+    ent_coef=0.01,
     max_grad_norm=0.5,
-    lr=1e-3,
+    lr=7e-4,
     lrschedule='linear',
     epsilon=1e-5,
     alpha=0.99,
@@ -190,35 +134,55 @@ def learn(
 
     set_global_seeds(seed)
 
+    total_timesteps = int(total_timesteps)
+
     # Get the nb of env
     nenvs = env.num_envs
-    policy = build_policy(env, network, **network_kwargs)
+
+    # Get state_space and action_space
+    ob_space = env.observation_space
+    ac_space = env.action_space
+
+    if isinstance(network, str):
+        network_type = network
+        policy_network_fn = get_network_builder(network_type)(**network_kwargs)
+        policy_network = policy_network_fn(ob_space.shape)
+
+    # Calculate the batch_size
+    nbatch = nenvs * nsteps
+    nupdates = total_timesteps // nbatch
 
     # Instantiate the model object (that creates step_model and train_model)
-    model = Model(policy=policy, env=env, nsteps=nsteps, ent_coef=ent_coef, vf_coef=vf_coef,
-        max_grad_norm=max_grad_norm, lr=lr, alpha=alpha, epsilon=epsilon, total_timesteps=total_timesteps, lrschedule=lrschedule)
+    model = Model(ac_space=ac_space, policy_network=policy_network, nupdates=nupdates, ent_coef=ent_coef, vf_coef=vf_coef,
+        max_grad_norm=max_grad_norm, lr=lr, alpha=alpha, epsilon=epsilon, total_timesteps=total_timesteps)
+
     if load_path is not None:
-        model.load(load_path)
+        load_path = osp.expanduser(load_path)
+        ckpt = tf.train.Checkpoint(model=model)
+        manager = tf.train.CheckpointManager(ckpt, load_path, max_to_keep=None)
+        ckpt.restore(manager.latest_checkpoint)
 
     # Instantiate the runner object
     runner = Runner(env, model, nsteps=nsteps, gamma=gamma)
-    epinfobuf = deque(maxlen=log_interval*nenvs)
-
-    # Calculate the batch_size
-    nbatch = nenvs*nsteps
+    epinfobuf = deque(maxlen=100)
 
     # Start total timer
     tstart = time.time()
 
-    for update in range(1, total_timesteps//nbatch+1):
+    for update in range(1, nupdates+1):
         # Get mini batch of experiences
         obs, states, rewards, masks, actions, values, epinfos = runner.run()
         epinfobuf.extend(epinfos)
 
-        rewards_std = (rewards - rewards.mean()) / (rewards.std() + 1e-8)
-        policy_loss, value_loss, policy_entropy = model.train(obs, states, rewards_std, masks, actions, values)
-
-        nseconds = time.time() - tstart
+        obs = tf.constant(obs)
+        if states is not None:
+            states = tf.constant(states)
+        rewards = tf.constant(rewards)
+        masks = tf.constant(masks)
+        actions = tf.constant(actions)
+        values = tf.constant(values)
+        policy_loss, value_loss, policy_entropy = model.train(obs, states, rewards, masks, actions, values)
+        nseconds = time.time()-tstart
 
         # Calculate the fps (frame per second)
         fps = int((update*nbatch)/nseconds)
@@ -230,14 +194,10 @@ def learn(
             logger.record_tabular("total_timesteps", update*nbatch)
             logger.record_tabular("fps", fps)
             logger.record_tabular("policy_entropy", float(policy_entropy))
-            logger.record_tabular("policy_loss", float(policy_loss))
             logger.record_tabular("value_loss", float(value_loss))
             logger.record_tabular("explained_variance", float(ev))
             logger.record_tabular("eprewmean", safemean([epinfo['r'] for epinfo in epinfobuf]))
-            logger.record_tabular("eprewmin", np.min([epinfo['r'] for epinfo in epinfobuf]))
-            logger.record_tabular("eprewmax", np.max([epinfo['r'] for epinfo in epinfobuf]))
             logger.record_tabular("eplenmean", safemean([epinfo['l'] for epinfo in epinfobuf]))
             logger.dump_tabular()
-    model.sess.close()
     return model
 
